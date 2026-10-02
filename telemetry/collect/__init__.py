@@ -195,12 +195,16 @@ def _api_error(L, d, t):
     L.run_event("llm.error", t, {"http_status": st, "provider_code": err,
                                  "error_code": None if nothing else tr.error_code.value,
                                  "error_code_source": None if nothing else tr.source})
+    # CMD-T11: 이 줄은 차례의 끝이기도 하다 -- Claude Code 의 계약: StopFailure 는 "When the turn ends due to an API error"
+    # (code.claude.com/docs/en/hooks.md, 2026-10-02 확인), Stop 과 갈린다. 그 오류 줄을 런타임이 스스로 남겼으므로 원천의 표지다.
+    # 짐작으로 닫지 않는다: isApiErrorMessage · apiErrorStatus 가 있는 줄에서만.
     q = d.get("quotaLimits")
     if isinstance(q, dict):
         v, n = _take(q, {"declared_status": "status", "limit_type": "rateLimitType", "overage_status": "overageStatus",
                          "overage_disabled_reason": "overageDisabledReason",
                          "fallback_available": "unifiedRateLimitFallbackAvailable"})
         L.run_event("provider.rate_limit", t, v, n)
+    L.run_event("turn.end", t, {"marker": "api_error", "error_type": err})
 
 
 def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[dict]":

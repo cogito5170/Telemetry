@@ -103,6 +103,11 @@ MUTANTS = [
      '        if d.get("parent_tool_use_id") and not _main_progress(d, L):', '        if d.get("parent_tool_use_id"):'),
     ("T10: 하위 에이전트 도구의 진행도 남김", "telemetry/collect/__init__.py",
      "    return ref in L.tools\n", "    return True\n"),
+    ("T11: API 오류로 끝난 차례를 안 닫음", "telemetry/collect/__init__.py",
+     '    L.run_event("turn.end", t, {"marker": "api_error", "error_type": err})\n', ''),
+    ("T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)", "telemetry/collect/__init__.py",
+     'elif d.get("type") == "assistant" and m.get("model") == "<synthetic>":\n                pass',
+     'elif d.get("type") == "assistant" and m.get("model") == "<synthetic>":\n                L.run_event("turn.end", t, {"marker": "synthetic"})'),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]
