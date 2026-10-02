@@ -117,7 +117,7 @@ operation has completed successfully" -- 그래서 L0 는 '실패' 라고 적지
 
 | 어디 | 무엇 | 판정 | 옮길 자리 · 처리 |
 |---|---|---|---|
-| Sensor `llmsensor/telemetry/collect.py` · `schema.py`(꼴 v3) | 원천 → 레코드 | **L0 맞음.** 이 저장소의 `collect` 가 그것을 그대로 옮겼고, `compat` 으로 되지은 v3 가 **같다**(시험) | **선택 의존으로 붙였다**: Sensor `llmsensor/telemetry/l0.py` -- 이 패키지가 있으면 이쪽 수집기 · 원장, 없으면 Sensor 수집기. `python3 -m llmsensor l0-check` 로 맞댄다 |
+| Sensor `llmsensor/telemetry/collect.py` · `schema.py`(꼴 v3) | 원천 → 레코드 | **L0 맞음** | **필수 의존으로 바꾸고 Sensor 수집기를 지웠다(CMD-T9 · BD-62)**: `collect.py` 는 같은 이름 · 서명의 이음매(L0 사건 → 꼴 v3), 지우기 전 출력은 `tests/golden/` · 장부 `v3_digest` 로 얼렸다 |
 | Sensor `llmsensor/telemetry/derive.py` | `token_burst`(중앙값 × 4) · `token_stagnation`(\|Δ\| < 1 %) · `token_oscillation` | **L1.** 문턱 있는 해석이 텔레메트리 패키지 안에 있었다 | **옮겼다**: Sensor `sensing/token/events.py`. 실데이터 9538 호출에서 출력 지문 불변(Sensor `tests/test_layer.py`) |
 | Sensor `llmsensor/telemetry/derive.py` | `cache_hit_ratio` · `call_span_ms` · `tool_error_rate` | 집계 -- L1 | Sensor `sensing` |
 | Sensor `sensing/execution` 의 `tool.timed_out` (Basis RUNTIME_DECLARED) | 런타임 선언 | L0 의 `declared` 와 같은 뜻 -- 맞음 | 그대로 |
@@ -134,8 +134,9 @@ operation has completed successfully" -- 그래서 L0 는 '실패' 라고 적지
 원천 ─► telemetry.collect / Recorder ─► L0 원장(JSONL) ─► telemetry.compat.to_sensor_records ─► llmsensor.state.normalize ─► State
 ```
 
-`compat` 은 llmsensor 를 import 하지 않는다. 꼴 v3 의 칸 순서를 그대로 들고 있고, 옆에 `../Sensor` 가 있으면 시험이 Sensor 수집기의 출력과
-**같음**을 확인한다(`tests/test_collect.py::SensorEquivalence` -- 세 원천 + State 정규화 묶음까지).
+`compat` 은 llmsensor 를 import 하지 않는다. 꼴 v3 의 칸 순서를 그대로 들고 있다. Sensor 의 옛 수집기는 지웠고(CMD-T9), 그 출력은
+`tests/golden/*.json` 에 얼려 두었다 -- `tests/test_collect.py::GoldenEquivalence` 가 L0 → compat 출력을 그것과 맞댄다. 옆에 `../Sensor` 가 있으면
+Sensor 이음매 · 꼴 v4 · State 정규화까지 확인한다(`SensorSitsOnL0`).
 v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_code · llm.request · llm.error · heartbeat · action.* …)은
 버린다 -- v3 를 넓히지 않는다. 그 칸들은 원장에 남아 있고, 새 L1 팩이 원장을 직접 읽을 때 쓰인다.
 
@@ -143,14 +144,20 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 
 | # | 물음 | 결정 (2026-10-02) | 상태 |
 |---|---|---|---|
-| 1 | Sensor → Telemetry 의존 | **선택 의존**. 실데이터에서 `l0-check` 가 계속 같으면 필수로 | 됨 -- 이 세션 JSONL 124/124 레코드 같음 |
+| 1 | Sensor → Telemetry 의존 | 선택 의존으로 시작 → BD-50 충족 뒤 **필수**(CMD-T9) | 됨 |
 | 2 | Sensor `derive.py` 의 문턱 있는 파생 | **sensing/token 으로 옮김** | 됨 -- 정의 불변 |
 | 3 | MS `RunRecord.policy` | **결정 기록으로 떼고 `decision_ref` 로 잇기** | 됨 |
 | 4 | MS 가 Recorder 로 L0 를 직접 내기 | 붙임(선택 의존) -- `ms/l0.py` · `Runtime(l0_ledger=…)` · `ms ask --l0-ledger` | 됨 -- 모형 호출 · 도구 호출 · 실행 시작/끝(+`decision_ref`). `action.*` 은 Action Executor 가 서면 |
 | 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | **Sensor 세션 소유**(baseline BD-45). 이 세션은 L0 사건 이름 · 칸만 정한다 -- 차례 경계 사건(BD-47, CMD-T2) | L0 쪽 됨 |
-| 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 기준 BD-50: 수집기 셋마다 서로 다른 실데이터 기록 3 개 이상에서 100 % 같음. 장부 `eval/l0_check.py` · `eval/results/l0_check_corpus.json` | 쌓는 중 -- sweagent 7 ✅ · cc_jsonl 1 · cc_stream 0 |
+| 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | BD-50 충족(BD-62) -> CMD-T9 | **됨** -- 이음매 · 필수 의존 · 없으면 분명한 ImportError. 원래 수집기 없는 대조는 아래 '대조를 대신하는 것' |
 
 ## 10. 잰 것 · 모르는 것
+
+- **대조를 대신하는 것(CMD-T9 뒤)** -- 비교할 '원래 수집기' 가 없어졌으므로 셋으로 나눈다:
+  1. **얼린 출력**: 지우기 직전 Sensor 수집기(Sensor `f6f02fc`)의 출력. 시험 고정 자료는 `tests/golden/*.json` 그대로(`GoldenEquivalence`),
+     실기록은 장부 `v3_digest`(고정 열쇠 지문) -- `python3 eval/l0_check.py --verify <source> <파일>`. 얼린 실기록: sweagent 7 · cc_stream 3 · cc_jsonl 2.
+  2. **불변식**(새 실기록에 쓴다): Sensor `l0.compare` / `python3 -m llmsensor l0-check` 가 이제 꼴 v4 통과 · 결정성 · State 정규화를 본다(`against: "invariants"`).
+  3. **변이**: `eval/mutation.py` 37/37 -- 얼린 출력과 달라지게 하는 변경(칸 순서 바꾸기 포함)은 시험이 잡는다.
 
 - **수집기 결함 D1–D4 고침(CMD-T6, Sensor `docs/MS_HEALTH_INVENTORY.md` §1)** -- L0 수집기와 Sensor 수집기(`llmsensor/telemetry/collect.py`)를 같은 규칙으로:
   - D1 시간 초과: 구조화 칸 `timedOutAfterMs` 먼저. 글 문구는 오류 결과이고 'Exit code' 로 시작할 때만(성공 출력의 인용은 아니다).

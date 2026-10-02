@@ -8,7 +8,9 @@
     python3 eval/l0_check.py --reported <source> <보고한 세션> <내용 해시> <native> <l0> <same> <telemetry> <sensor>
         다른 세션이 자기 기록으로 돌린 결과를 옮겨 적는다(그 세션의 기록은 이 컨테이너에 없다). reported_by 가 붙는다.
 
-옆에 ../Sensor 가 있어야 한다(llmsensor.telemetry.l0.compare 를 쓴다). 장부(eval/results/l0_check_corpus.json)에는
+옆에 ../Sensor 가 있어야 한다(llmsensor.telemetry.l0.compare 를 쓴다).
+CMD-T9 뒤에는 Sensor 의 원래 수집기가 없다 -- 기본 대조는 L0 경로의 불변식(`against: "invariants"`)이고,
+지우기 전 출력과의 대조는 --verify(얼린 v3_digest)다. 장부(eval/results/l0_check_corpus.json)에는
 **내용을 남기지 않는다**: 기록 식별자의 해시 · 파일 내용 해시 · 레코드 수 · 같은가 · 다르면 다른 칸 이름뿐.
 
 BD-50 기준: 수집기 셋(cc_jsonl · cc_stream · sweagent)마다 **서로 다른 기록** 3 개 이상에서 100 % 같다.

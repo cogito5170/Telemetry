@@ -132,17 +132,16 @@ class SensorSeesTheFixes(unittest.TestCase):
         sys.path.insert(0, str(SENSOR))
 
     def test_same_records_and_limited_state(self):
+        """얼린 Sensor 수집기 출력(tests/golden/actions_*.json, D1 · D2 고친 뒤 · 지우기 전)과 같고, State 가 429 를 본다."""
         from llmsensor.state import StateEngine, from_telemetry
-        from llmsensor.telemetry import collect as S
-        with tempfile.TemporaryDirectory() as d:
-            p = _write(d, "s.jsonl", SESSION)
-            ours = to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY)))
-            theirs = S.from_cc_jsonl(p, "x", S.Hasher(KEY))
-            ps = _write(d, "a.stream.jsonl", STREAM)
-            self.assertEqual(sorted(map(json.dumps, to_sensor_records(from_cc_stream(ps, "s", Hasher(KEY))))),
-                             sorted(map(json.dumps, S.from_cc_stream(ps, "s", S.Hasher(KEY)))))
+        g = pathlib.Path(__file__).resolve().parent / "golden"
         key = lambda r: (r["kind"], r.get("tool_index", r.get("call_index", -1)))
-        self.assertEqual(sorted(ours, key=key), sorted(theirs, key=key))
+        with tempfile.TemporaryDirectory() as d:
+            ours = to_sensor_records(from_cc_jsonl(_write(d, "s.jsonl", SESSION), "x", Hasher(KEY)))
+            stream = to_sensor_records(from_cc_stream(_write(d, "a.stream.jsonl", STREAM), "s", Hasher(KEY)))
+        for got, name in ((ours, "actions_cc_jsonl"), (stream, "actions_cc_stream")):
+            want = json.loads((g / f"{name}.json").read_text(encoding="utf-8"))
+            self.assertEqual(sorted(got, key=key), sorted(want, key=key), name)
         E = StateEngine().ingest_all(from_telemetry(ours))
         st = {n: s.value for (_, n), s in E.current.items()}
         self.assertEqual(st.get("rate_limit_state"), "LIMITED")                # 전에는 UNKNOWN

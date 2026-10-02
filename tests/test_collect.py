@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import sys
@@ -114,54 +115,73 @@ class SweAgent(unittest.TestCase):
         self.assertIn("tokens_received", end["reported_null"])
 
 
-@unittest.skipUnless((SENSOR / "llmsensor").is_dir(), "옆에 ../Sensor 가 없다")
-class SensorEquivalence(unittest.TestCase):
-    """L0 원장에서 되지은 꼴 v3 레코드가 Sensor 수집기의 출력과 **같다** -- 옮기며 잃은 관측이 없다."""
+GOLDEN = pathlib.Path(__file__).resolve().parent / "golden"
 
-    @classmethod
-    def setUpClass(cls):
-        sys.path.insert(0, str(SENSOR))
-        from llmsensor.telemetry import collect as S
-        from llmsensor.telemetry.schema import check as v3check
-        cls.S, cls.v3check = S, staticmethod(v3check)
 
-    def _same(self, ours, theirs):
-        key = lambda r: (r["kind"], r["tool_index"] if r["kind"] == "tool_call" else r.get("call_index", -1))
-        self.assertEqual(sorted(ours, key=key), sorted(theirs, key=key))
-        self.assertEqual([self.v3check(r) for r in ours], [[]] * len(ours))
+def golden(name):
+    return json.loads((GOLDEN / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def _key(r):
+    return (r["kind"], r["tool_index"] if r["kind"] == "tool_call" else r.get("call_index", -1))
+
+
+class GoldenEquivalence(unittest.TestCase):
+    """L0 원장에서 되지은 꼴 v3 레코드가 **지우기 전 Sensor 수집기의 출력**과 같다(CMD-T9).
+    tests/golden/*.json 은 Sensor 수집기(Sensor f6f02fc)가 같은 고정 자료 · 같은 열쇠로 낸 것을 얼린 것이다.
+    이제 비교할 '원래 수집기' 가 없으므로 이 파일들이 그 자리를 맡는다 -- 고치지 말 것(바꾸려면 까닭을 적고 새 판으로)."""
+
+    def _same(self, ours, name):
+        self.assertEqual(sorted(ours, key=_key), sorted(golden(name), key=_key))
 
     def test_cc_jsonl(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "s.jsonl")
             write_session(p, SESSION, COST)
-            self._same(to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY))),
-                       self.S.from_cc_jsonl(p, "x", self.S.Hasher(KEY)))
+            self._same(to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY))), "cc_jsonl_cost")
             write_session(p, SESSION)                                 # cost-state 없음 -> run 레코드 없음
-            self._same(to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY))),
-                       self.S.from_cc_jsonl(p, "x", self.S.Hasher(KEY)))
+            self._same(to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY))), "cc_jsonl_nocost")
 
     def test_cc_stream(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "a.stream.jsonl")
             write_stream(p)
-            self._same(to_sensor_records(from_cc_stream(p, "s", Hasher(KEY))),
-                       self.S.from_cc_stream(p, "s", self.S.Hasher(KEY)))
+            self._same(to_sensor_records(from_cc_stream(p, "s", Hasher(KEY))), "cc_stream")
 
     def test_sweagent(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "a.traj.gz")
             write_traj(p)
-            self._same(to_sensor_records(from_sweagent(p, "w", Hasher(KEY))),
-                       self.S.from_sweagent(p, "w", self.S.Hasher(KEY)))
+            self._same(to_sensor_records(from_sweagent(p, "w", Hasher(KEY))), "sweagent")
+
+
+@unittest.skipUnless((SENSOR / "llmsensor").is_dir(), "옆에 ../Sensor 가 없다")
+class SensorSitsOnL0(unittest.TestCase):
+    """Sensor 의 이음매(llmsensor.telemetry.collect)와 State 층이 L0 위에 그대로 앉는다."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(SENSOR))
+
+    def test_seam_is_l0_and_records_pass_v4(self):
+        from llmsensor.telemetry import collect as S
+        from llmsensor.telemetry.schema import check as v4check
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "s.jsonl")
+            write_session(p, SESSION, COST)
+            ours = to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY)))
+            seam = S.from_cc_jsonl(p, "x", S.Hasher(KEY))
+        self.assertEqual(sorted(seam, key=_key), sorted(ours, key=_key))
+        self.assertEqual([v4check(r) for r in ours], [[]] * len(ours))
 
     def test_sensor_state_engine_sits_on_l0(self):
-        """L0 -> compat -> Sensor 의 State 층(정규화 묶음)까지 그대로 흐른다."""
+        """L0 -> compat -> Sensor 의 State 층(정규화 묶음)이 얼린 출력과 같은 관측을 낸다."""
         from llmsensor.state.normalize import from_telemetry
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "s.jsonl")
             write_session(p, SESSION, COST)
             ours = from_telemetry(to_sensor_records(from_cc_jsonl(p, "x", Hasher(KEY))))
-            theirs = from_telemetry(self.S.from_cc_jsonl(p, "x", self.S.Hasher(KEY)))
+        theirs = from_telemetry(golden("cc_jsonl_cost"))
         flat = lambda bs: [(b.record_id, [(o.field, o.value, o.reported_null) for o in b.observations]) for b in bs]
         self.assertEqual(flat(ours), flat(theirs))
         self.assertTrue(ours)
