@@ -147,6 +147,13 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "overage_status": _f("str", D), "overage_disabled_reason": _f("str", D),
         "fallback_available": _f("bool", D, "런타임이 대체 경로가 있다고 선언했나"),
     },
+    # CMD-T15: 런타임이 창마다 따로 준 사용률(cc_stream rate_limit_info.unifiedWindows). 창 하나에 사건 하나 --
+    # 같은 원천 줄의 provider.rate_limit 바로 뒤에 원천에 나온 차례대로 온다. 어느 창이 '주된' 창인지는 고르지 않는다(L1)
+    "provider.rate_limit_window": {
+        "window_name": _f("str", D, "창 이름 = 원천 unifiedWindows 의 키 그대로(five_hour · seven_day ...)"),
+        "utilization": _f("num", R, "그 창의 사용률(원천 값 그대로)"),
+        "resets_at_ms": _f("num", D, "그 창의 재설정 시각(unix ms). 원천 resetsAt 은 unix **초** -- 단위만 옮긴다"),
+    },
     # ── 런타임 자신의 행동 (BD-53) ──
     "runtime.compaction": {
         "trigger": _f("str", D, "auto · manual -- 런타임이 붙인 이름 그대로"),

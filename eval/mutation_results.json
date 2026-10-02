@@ -182,56 +182,81 @@
  {
   "mutant": "T10: tool_progress 를 다시 하위 에이전트로 거름",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T12: tool_use_id 만 봄(T10 의 결함 -- 실기록 0/8)",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T12: 도구 이름을 안 맞춤(하위 에이전트 진행이 Task 호출 id 로 새어 들어옴)",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T11: API 오류로 끝난 차례를 안 닫음",
   "red": true,
-  "tail": "FAILED (failures=2)"
+  "tail": "FAILED (failures=4)"
  },
  {
   "mutant": "T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T14: 초를 그대로 ms 로 적음",
   "red": true,
-  "tail": "FAILED (failures=2)"
+  "tail": "FAILED (failures=5)"
  },
  {
   "mutant": "T14: resetsAt 을 안 읽음(못 봄으로 잘못 적음)",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=6)"
  },
  {
   "mutant": "T14: stream 의 한도 종류를 안 읽음",
   "red": true,
-  "tail": "FAILED (errors=1)"
+  "tail": "FAILED (failures=2, errors=3)"
  },
  {
-  "mutant": "T13: isMeta 경계를 버림(재개 차례가 사라짐)",
+  "mutant": "T15: unifiedWindows 를 안 실음",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=4)"
  },
  {
-  "mutant": "T13: 경계 선언 없는 isMeta 줄도 차례를 엶",
+  "mutant": "T15: 창 resetsAt 초를 그대로 ms 로",
   "red": true,
   "tail": "FAILED (failures=3, errors=1)"
  },
  {
+  "mutant": "T15: 창 이름을 지어 붙임(원천 키를 버림)",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "T15: 창을 사용률 순으로 줄 세움(해석)",
+  "red": true,
+  "tail": "FAILED (failures=3, errors=1)"
+ },
+ {
+  "mutant": "T15: 수가 아닌 사용률도 실음",
+  "red": true,
+  "tail": "FAILED (failures=2, errors=1)"
+ },
+ {
+  "mutant": "T13: isMeta 경계를 버림(재개 차례가 사라짐)",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T13: 경계 선언 없는 isMeta 줄도 차례를 엶",
+  "red": true,
+  "tail": "FAILED (failures=5, errors=1)"
+ },
+ {
   "mutant": "L0 가 위층을 import",
   "red": true,
-  "tail": "FAILED (failures=2)"
+  "tail": "FAILED (failures=4)"
  }
 ]

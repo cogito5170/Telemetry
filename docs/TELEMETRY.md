@@ -73,6 +73,7 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 | `run.snapshot` | 실행 도중의 누적 스냅숏(Claude Code cost-state -- 끝이 아니다) | cc_jsonl | cost |
 | `runtime.limits` | 런타임이 선언한 맥락 창 · 최대 출력 · 자동 압축 문턱 | cc_stream | token |
 | `provider.rate_limit` | **계정**의 요금 한도(BD-32) -- 사용률 · 상태 문자열 · 문턱 · 한도 종류(five_hour …) · 초과 사용 상태 · 대체 경로. **사건마다** 따로 | cc_stream(`rate_limit_event`) · cc_jsonl(429 줄의 `quotaLimits`) | provider |
+| `provider.rate_limit_window` | 런타임이 **창마다** 따로 준 사용률 · 재설정 시각(CMD-T15). 창 이름은 원천 키 그대로(five_hour · seven_day …), 창 하나에 사건 하나, 같은 줄의 `provider.rate_limit` 바로 뒤에 원천 차례대로. 어느 창이 주된 창인지는 고르지 않는다(L1) | cc_stream(`rate_limit_info.unifiedWindows`) | provider |
 | `input.received` | 런타임이 입력을 받아 줄에 세움(글은 길이만) | cc_jsonl(`queue-operation enqueue`) | liveness |
 | `turn.start` | 입력이 대화에 들어가 차례가 열림 -- 런타임이 매긴 차례 · 프롬프트 번호, 차례 출처 이름(human · task_notification …) | cc_jsonl(사람 · 알림 입력 줄. isMeta · 하위 에이전트 줄 제외) · cc_stream(`system/init`) | liveness |
 | `turn.end` | 런타임이 차례 끝을 선언함(`marker`: stop_hook_summary · result · api_error, API 오류면 `error_type`) | cc_jsonl(Stop 훅 요약, 막히지 않았을 때 · 런타임이 끼운 API 오류 줄 -- Claude Code `StopFailure` 계약: "When the turn ends due to an API error") · cc_stream(`result`) | liveness |

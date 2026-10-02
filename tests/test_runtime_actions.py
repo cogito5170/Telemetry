@@ -169,6 +169,52 @@ class ResetsAt(unittest.TestCase):
         self.assertEqual(rl["resets_at_ms"], 1790900000 * 1000)
 
 
+class RateLimitWindows(unittest.TestCase):
+    """CMD-T15: rate_limit_info.unifiedWindows -> 창마다 provider.rate_limit_window. 창 이름은 원천 키 그대로,
+    값은 원천이 준 것만, 어느 창도 고르지 않는다. 같은 줄의 provider.rate_limit 바로 뒤에 원천 차례대로."""
+
+    # 실기록 claude -p 캡처 셋의 키 꼴(값은 지어냄): 창 둘, 창마다 utilization · resetsAt
+    INFO = {"status": "allowed", "resetsAt": 1790913600, "rateLimitType": "five_hour", "isUsingOverage": False,
+            "overageStatus": "rejected", "overageDisabledReason": "org_level_disabled",
+            "unifiedWindows": {"seven_day": {"utilization": 0.07, "resetsAt": 1791400000},
+                               "five_hour": {"utilization": 0.41, "resetsAt": 1790913600}}}
+
+    def _stream(self, info):
+        rows = [{"_t": 0, "line": {"type": "system", "subtype": "init"}},
+                {"_t": 5, "line": {"type": "rate_limit_event", "rate_limit_info": info}},
+                {"_t": 9, "line": {"type": "result", "subtype": "success"}}]
+        with tempfile.TemporaryDirectory() as d:
+            return from_cc_stream(_write(d, "w.stream.jsonl", rows), "s", Hasher(KEY))
+
+    def test_one_event_per_window_in_source_order(self):
+        evs = self._stream(self.INFO)
+        self.assertEqual([check(e) for e in evs], [[]] * len(evs))
+        ws = _of(evs, "provider.rate_limit_window")
+        self.assertEqual([w["data"]["window_name"] for w in ws], ["seven_day", "five_hour"])   # 원천 차례 -- 고르거나 줄 세우지 않는다
+        self.assertEqual(ws[0]["data"]["utilization"], 0.07)
+        self.assertEqual(ws[0]["data"]["resets_at_ms"], 1791400000 * 1000)
+        self.assertEqual({w["at"] for w in ws}, {5})
+        rl = _of(evs, "provider.rate_limit")[0]
+        self.assertEqual([w["seq"] for w in ws], [rl["seq"] + 1, rl["seq"] + 2])          # 같은 줄의 한도 보고 바로 뒤
+        self.assertIn("utilization", rl["unobserved"])           # 이 꼴에는 맨 위 utilization 이 없다 -- 창 값을 끌어올리지 않는다
+
+    def test_missing_null_and_odd_values(self):
+        self.assertEqual(_of(self._stream({"status": "allowed"}), "provider.rate_limit_window"), [])
+        self.assertEqual(_of(self._stream({"status": "allowed", "unifiedWindows": None}), "provider.rate_limit_window"), [])
+        ws = _of(self._stream({"unifiedWindows": {"a": {"utilization": None}, "b": {"utilization": "high", "resetsAt": "x"},
+                                                   "c": 3, "d": {"utilization": True}}}), "provider.rate_limit_window")
+        self.assertEqual([w["data"]["window_name"] for w in ws], ["a", "b", "c", "d"])
+        self.assertIn("utilization", ws[0]["reported_null"])
+        self.assertIn("resets_at_ms", ws[0]["unobserved"])
+        for w in ws[1:]:
+            self.assertEqual(sorted(w["unobserved"]), ["resets_at_ms", "utilization"])
+
+    def test_v3_records_unchanged(self):
+        base = dict(self.INFO)
+        del base["unifiedWindows"]
+        self.assertEqual(to_sensor_records(self._stream(self.INFO)), to_sensor_records(self._stream(base)))
+
+
 class ToolProgressHeartbeats(unittest.TestCase):
     """CMD-T12: 실제 t11 꼴 -- 두 id 를 다 단다. tool_use_id 는 지어낸 bash-progress-<n>, 진행 중인 Bash 의 id 는 parent_tool_use_id.
     주 에이전트 도구의 진행은 heartbeat 8, 하위 에이전트(Task) 안 도구의 진행은 걸러진다."""

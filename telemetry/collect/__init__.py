@@ -187,6 +187,25 @@ def _resets_at(src: dict) -> "tuple[dict, list]":
     return {}, []
 
 
+def _windows(info: dict) -> "list[tuple[dict, list]]":
+    """CMD-T15: rate_limit_info.unifiedWindows {창 이름: {utilization, resetsAt}} -> 창마다 (값들, 보고된 null).
+    창 이름은 원천 키 그대로, 원천에 나온 차례대로. 수가 아닌 값은 못 봄(짐작해 바꾸지 않는다). 창을 고르지 않는다."""
+    ws = info.get("unifiedWindows")
+    if not isinstance(ws, dict):
+        return []
+    out = []
+    for name, w in ws.items():
+        w = w if isinstance(w, dict) else {}
+        v, n = _resets_at(w)
+        u = w.get("utilization")
+        if "utilization" in w and u is None:
+            n = n + ["utilization"]
+        elif isinstance(u, (int, float)) and not isinstance(u, bool):
+            v["utilization"] = u
+        out.append(({"window_name": str(name), **v}, n))
+    return out
+
+
 def _compaction(meta) -> "tuple[dict, list]":
     """compact_boundary 의 메타. JSONL 은 camelCase, SDK stream 은 snake_case(stream 꼴은 실기록으로 확인 못 함)."""
     meta = meta if isinstance(meta, dict) else {}
@@ -427,6 +446,8 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
                                                    "declared_status": info.get("status"),
                                                    "declared_threshold": info.get("surpassedThreshold"), **rv, **ov},
                         rn + on)
+            for wv, wn in _windows(info):
+                L.run_event("provider.rate_limit_window", t, wv, wn)
         elif ty == "autocompact_state":
             L.run_event("runtime.limits", t, {"autocompact_threshold": (d.get("value") or {}).get("threshold")})
         elif ty == "result":
