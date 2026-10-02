@@ -103,16 +103,16 @@ operation has completed successfully" -- 그래서 L0 는 '실패' 라고 적지
 
 ## 7. 지금 저장소들의 경계 점검 (2026-10-02)
 
-코드는 **고치지 않았다**. 옮길 자리만 적는다 -- 옮길지는 사용자 결정이다(9 절).
+처음 점검 때는 코드를 고치지 않았다. 사용자가 9 절의 1 · 2 · 3 을 정했고(2026-10-02) 아래 '처리' 칸이 그 결과다.
 
-| 어디 | 무엇 | 판정 | 옮길 자리 |
+| 어디 | 무엇 | 판정 | 옮길 자리 · 처리 |
 |---|---|---|---|
-| Sensor `llmsensor/telemetry/collect.py` · `schema.py`(꼴 v3) | 원천 → 레코드 | **L0 맞음.** 이 저장소의 `collect` 가 그것을 그대로 옮겼고, `compat` 으로 되지은 v3 가 **같다**(시험) | 이 저장소로 일원화 |
-| Sensor `llmsensor/telemetry/derive.py` | `token_burst`(중앙값 × 4) · `token_stagnation`(\|Δ\| < 1 %) · `token_oscillation` | **L1.** 문턱 있는 해석이 텔레메트리 패키지 안에 있다 | Sensor `sensing/token` |
+| Sensor `llmsensor/telemetry/collect.py` · `schema.py`(꼴 v3) | 원천 → 레코드 | **L0 맞음.** 이 저장소의 `collect` 가 그것을 그대로 옮겼고, `compat` 으로 되지은 v3 가 **같다**(시험) | **선택 의존으로 붙였다**: Sensor `llmsensor/telemetry/l0.py` -- 이 패키지가 있으면 이쪽 수집기 · 원장, 없으면 Sensor 수집기. `python3 -m llmsensor l0-check` 로 맞댄다 |
+| Sensor `llmsensor/telemetry/derive.py` | `token_burst`(중앙값 × 4) · `token_stagnation`(\|Δ\| < 1 %) · `token_oscillation` | **L1.** 문턱 있는 해석이 텔레메트리 패키지 안에 있었다 | **옮겼다**: Sensor `sensing/token/events.py`. 실데이터 9538 호출에서 출력 지문 불변(Sensor `tests/test_layer.py`) |
 | Sensor `llmsensor/telemetry/derive.py` | `cache_hit_ratio` · `call_span_ms` · `tool_error_rate` | 집계 -- L1 | Sensor `sensing` |
 | Sensor `sensing/execution` 의 `tool.timed_out` (Basis RUNTIME_DECLARED) | 런타임 선언 | L0 의 `declared` 와 같은 뜻 -- 맞음 | 그대로 |
 | Sensor `sensing/cost` (단가표 × 토큰) | 계산 비용 | L1 맞음 | 그대로 |
-| MS `run_telemetry.RunRecord.policy` (context_policy · prompt_policy · arbiter_decision · **정책이 본 state**) | 결정 · 상태가 텔레메트리 기록 안에 | **L0 위반.** `to_signals` 가 이미 신호로 안 펴지만, 기록 자체에 섞여 있다 | CR 결정 기록 / Policy 기록. L0 에는 `action.dispatch.decision_ref` |
+| MS `run_telemetry.RunRecord.policy` (context_policy · prompt_policy · arbiter_decision · **정책이 본 state**) | 결정 · 상태가 텔레메트리 기록 안에 | **L0 위반이었다** | **뗐다**: MS `ms/decision_record.py` 의 DecisionRecord(id = 내용 sha256). RunRecord 는 `decision_ref` 만(ms-run-telemetry-3). 원장에 결정 줄이 먼저, 실행 줄이 id 로 가리킨다. L0 `action.dispatch.decision_ref` 도 그 id 를 쓴다 |
 | MS `RunRecord.cost.source = "가격표"` · `tokens.context_tokens` · `retrieved_tokens`(추정) | 계산 · 추정 | L1 | 원천 보고 비용만 L0 에 |
 | MS `RunRecord.interaction.retries` ("DENY 나 못 읽은 제안 때문에") | 까닭이 붙은 수 | 수는 사실이지만 까닭 분류는 해석 | L0: `llm.request.attempt` · `action.*`, 분류는 L1 |
 | MS `RunRecord.outcome.task_success` | 평가자 라벨 | 바깥 관측 -- 사실이지만 런타임 관측이 아니다 | 앞으로 따로 사건 종류(평가 라벨)로. 지금 L0 에 없다 |
@@ -129,15 +129,16 @@ operation has completed successfully" -- 그래서 L0 는 '실패' 라고 적지
 v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_code · llm.request · llm.error · heartbeat · action.* …)은
 버린다 -- v3 를 넓히지 않는다. 그 칸들은 원장에 남아 있고, 새 L1 팩이 원장을 직접 읽을 때 쓰인다.
 
-## 9. 다음 -- 사용자 결정이 필요한 것
+## 9. 정한 것 · 남은 것
 
-| # | 물음 | 선택지 | 제안 |
+| # | 물음 | 결정 (2026-10-02) | 상태 |
 |---|---|---|---|
-| 1 | Sensor → Telemetry 의존 | (a) 선택 의존(`pip install git+…/Telemetry`, 없으면 지금 수집기) · (b) 필수 의존, Sensor 의 `telemetry/collect.py` 삭제 | (a) 로 시작해 v3 대조가 실데이터에서 계속 같으면 (b) |
-| 2 | Sensor `derive.py` 의 문턱 있는 파생 | sensing/token 으로 옮김 | 옮김 -- 뜻 불변 시험과 함께 |
-| 3 | MS `RunRecord.policy` | (a) 그대로 두고 문서로만 표시 · (b) 결정 기록으로 떼고 `decision_ref` 로 잇기 | (b) -- 계획 ⑤ Policy 와 같이 |
-| 4 | MS 가 Recorder 로 L0 를 직접 내기 | 계획 ②③ 사이 | Sensor 배선(②)과 같이 |
-| 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | L0 사건은 준비됨 | 문턱은 운영자 설정만(Sensor 의 규율) |
+| 1 | Sensor → Telemetry 의존 | **선택 의존**. 실데이터에서 `l0-check` 가 계속 같으면 필수로 | 됨 -- 이 세션 JSONL 124/124 레코드 같음 |
+| 2 | Sensor `derive.py` 의 문턱 있는 파생 | **sensing/token 으로 옮김** | 됨 -- 정의 불변 |
+| 3 | MS `RunRecord.policy` | **결정 기록으로 떼고 `decision_ref` 로 잇기** | 됨 |
+| 4 | MS 가 Recorder 로 L0 를 직접 내기 | 계획 ②(Sensor 배선)와 같이 | 남음 |
+| 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | L0 사건은 준비됨. 문턱은 운영자 설정만 | 남음 |
+| 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 1 의 대조가 실데이터에서 쌓인 뒤 | 남음 |
 
 ## 10. 잰 것 · 모르는 것
 

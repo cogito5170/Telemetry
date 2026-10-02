@@ -62,7 +62,8 @@ python3 eval/mutation.py                      # 변이 17 가지 -- 모두 빨�
 ## 알고 쓸 것
 
 - 수집기 셋은 Sensor 의 수집기(꼴 v3)를 옮긴 것이다. 같은 원천에서 `compat` 이 되지은 레코드는 Sensor 의 것과 **같다**(시험 · 실데이터 한 세션).
-- Sensor · MS 는 **아직 이 저장소를 쓰지 않는다.** 의존 방향과 MS `RunRecord.policy` 의 처리는 결정이 필요하다 -- `docs/TELEMETRY.md` 9 절.
+- Sensor 는 이 저장소를 **선택 의존**으로 쓴다(`llmsensor.telemetry.l0` · `pip install \"llmsensor[l0]\"`). 없으면 Sensor 수집기로 돈다.
+- MS 는 결정 기록을 텔레메트리에서 뗐다(`RunRecord.decision_ref` → `DecisionRecord.id`). MS 런타임이 Recorder 로 L0 를 직접 내는 것은 아직이다 -- `docs/TELEMETRY.md` 9 절.
 - `Recorder` 는 시험만 있고 아직 어느 런타임에도 안 붙었다.
 - liveness · recovery · dependency · action_outcome 의 **L0 사건은 있다**(heartbeat · llm.request.attempt · dependency.probe · action.*).
   그것을 읽는 L1 팩은 아직 없다.
