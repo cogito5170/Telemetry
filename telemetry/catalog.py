@@ -110,6 +110,25 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "cost_usd": _f("num", R), "reported_input_tokens": _f("int", R), "reported_output_tokens": _f("int", R),
         "reported_cache_read_input_tokens": _f("int", R), "reported_cache_creation_input_tokens": _f("int", R),
     },
+    # ── 차례 경계 (BD-47: L1 liveness 의 입력. 차례가 열려 있나 · 무음 길이는 L1 이 이 사건들에서 잰다) ──
+    "input.received": {
+        "input_chars": _f("int", M, "받은 입력의 길이(글은 안 남긴다)"),
+    },
+    "turn.start": {
+        "turn_index": _f("int", R, "런타임이 매긴 차례 번호"), "prompt_index": _f("int", R),
+        "turn_origin": _f("str", D, "런타임이 붙인 차례의 출처 이름 그대로(human · task_notification …)"),
+        "input_chars": _f("int", M),
+    },
+    "turn.end": {
+        "marker": _f("str", R, "끝을 선언한 원천 줄의 종류(stop_hook_summary · result)"),
+        "stop_hook_count": _f("int", R),
+    },
+    "turn.continued": {
+        "marker": _f("str", R), "stop_hook_count": _f("int", R, "Stop 훅이 끝을 막아 차례가 이어졌다"),
+    },
+    "source.closed": {
+        "exit_code": _f("int", R, "원천 프로세스의 종료 코드(수집기가 받았을 때만)"),
+    },
     # ── 런타임 · 공급자가 선언한 한도와 사용률 ────────────────────────────────
     "runtime.limits": {
         "context_window": _f("int", D), "max_output_tokens": _f("int", D), "autocompact_threshold": _f("int", D),
@@ -142,6 +161,8 @@ FORBIDDEN = frozenset({
     "pressure", "alert", "decision", "suggest", "suggested", "good", "bad", "ok", "slow", "fast", "normal", "abnormal",
     "exceeded", "violation", "violated", "warning", "critical", "stale", "stuck", "loop", "success", "failure",
     "failed",
+    # 생존 판정 어휘(BD-47) -- 차례가 열려 있나 · 멈췄나 · 살아 있나는 L1 liveness 가 L0 사건에서 잰다
+    "alive", "dead", "stalled", "hung", "idle", "active", "liveness",
 })
 # 문턱 · 한도 낱말은 **원천이 선언했을 때만**(declared). 우리 문턱은 L0 에 없다
 THRESHOLD_WORDS = frozenset({"threshold", "limit", "slo", "budget", "max", "window", "deadline", "timeout"})

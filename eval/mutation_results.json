@@ -2,12 +2,12 @@
  {
   "mutant": "해석 칸 하나를 목록에 넣음",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=2)"
  },
  {
   "mutant": "우리 문턱을 measured 로 넣음",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=2)"
  },
  {
   "mutant": "Recorder 가 경과 시간으로 시간 초과를 판정",
@@ -42,7 +42,7 @@
  {
   "mutant": "하위 에이전트 줄을 섞음",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=4, errors=1)"
  },
  {
   "mutant": "겨냥 경로를 평문으로",
@@ -62,7 +62,7 @@
  {
   "mutant": "0 을 못 봄으로",
   "red": true,
-  "tail": "FAILED (failures=5, errors=3)"
+  "tail": "FAILED (failures=6, errors=3)"
  },
  {
   "mutant": "봉투를 연다(모르는 칸 허용)",
@@ -93,6 +93,36 @@
   "mutant": "오류 메시지를 남김",
   "red": true,
   "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutant": "Stop 훅이 막은 끝을 끝으로",
+  "red": true,
+  "tail": "FAILED (failures=1, errors=1)"
+ },
+ {
+  "mutant": "isMeta 줄을 입력으로",
+  "red": true,
+  "tail": "FAILED (failures=1, errors=1)"
+ },
+ {
+  "mutant": "닫힘 표시 없이 파일 끝을 닫힘으로",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "L0 가 turn_open 을 계산해 싣는다",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "원천 순서를 버림(옛 순서)",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "번호가 없는 차례에 번호를 세어 메움",
+  "red": true,
+  "tail": "FAILED (failures=1)"
  },
  {
   "mutant": "L0 가 위층을 import",

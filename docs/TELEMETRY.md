@@ -58,6 +58,8 @@ L5  Action      실행                                                      MS T
 
 CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:seq` 는 한 원장 안에서 유일하다. `at` 은 그 일을 본 시각
 (`time_base`: unix_ms · monotonic_ms · 원천에 시각이 없으면 null -- 그때 순서는 seq 가 준다).
+**seq 는 원천에 나온 차례다**(2026-10-02, CMD-T2): 로그 수집기는 원천 줄 번호로 늘어놓는다 -- 모형 호출은 첫 줄 자리, 도구 시작 · 끝 ·
+차례 경계 · 실행 단위 사건은 제 줄 자리. 그래서 `at`(모형 호출은 마지막으로 본 시각)이 seq 를 따라 꼭 늘지는 않는다.
 
 ## 4. 사건 목록 (`telemetry/catalog.py`)
 
@@ -71,6 +73,11 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 | `run.snapshot` | 실행 도중의 누적 스냅숏(Claude Code cost-state -- 끝이 아니다) | cc_jsonl | cost |
 | `runtime.limits` | 런타임이 선언한 맥락 창 · 최대 출력 · 자동 압축 문턱 | cc_stream | token |
 | `provider.rate_limit` | 사용률 · 런타임 상태 문자열 · 런타임 문턱 -- **사건마다** 따로(마지막 값으로 덮지 않는다) | cc_stream | provider |
+| `input.received` | 런타임이 입력을 받아 줄에 세움(글은 길이만) | cc_jsonl(`queue-operation enqueue`) | liveness |
+| `turn.start` | 입력이 대화에 들어가 차례가 열림 -- 런타임이 매긴 차례 · 프롬프트 번호, 차례 출처 이름(human · task_notification …) | cc_jsonl(사람 · 알림 입력 줄. isMeta · 하위 에이전트 줄 제외) · cc_stream(`system/init`) | liveness |
+| `turn.end` | 런타임이 차례 끝을 선언함(`marker`: stop_hook_summary · result) | cc_jsonl(Stop 훅 요약, 막히지 않았을 때) · cc_stream(`result`) | liveness |
+| `turn.continued` | Stop 훅이 끝을 막아 차례가 이어짐 | cc_jsonl(`preventedContinuation: true`) | liveness |
+| `source.closed` | 원천의 흐름이 닫힘(종료 코드) -- **수집기가 닫힘을 적었을 때만**. 파일 끝은 닫힘이 아니다 | cc_stream(캡처의 `{"_t", "closed": true, "returncode"}` 줄) | liveness |
 | `heartbeat` | 살아 있다는 박동(emitter 마다 번호) | Recorder | **liveness**(새) |
 | `dependency.probe` | 의존 대상 탐침 -- 상태 코드 · 오류 코드 · 경과 | Recorder | **dependency**(새) |
 | `action.dispatch` · `action.result` | 실행기가 **실제로 실행한** 행동과 그 결과. 결정과는 `decision_ref`(id)로만 잇는다 | Recorder | **action_outcome**(새) |
@@ -137,10 +144,14 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 | 2 | Sensor `derive.py` 의 문턱 있는 파생 | **sensing/token 으로 옮김** | 됨 -- 정의 불변 |
 | 3 | MS `RunRecord.policy` | **결정 기록으로 떼고 `decision_ref` 로 잇기** | 됨 |
 | 4 | MS 가 Recorder 로 L0 를 직접 내기 | 붙임(선택 의존) -- `ms/l0.py` · `Runtime(l0_ledger=…)` · `ms ask --l0-ledger` | 됨 -- 모형 호출 · 도구 호출 · 실행 시작/끝(+`decision_ref`). `action.*` 은 Action Executor 가 서면 |
-| 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | L0 사건은 준비됨. 문턱은 운영자 설정만 | 남음 |
-| 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 1 의 대조가 실데이터에서 쌓인 뒤 | 남음 |
+| 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | **Sensor 세션 소유**(baseline BD-45). 이 세션은 L0 사건 이름 · 칸만 정한다 -- 차례 경계 사건(BD-47, CMD-T2) | L0 쪽 됨 |
+| 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 기준 BD-50: 수집기 셋마다 서로 다른 실데이터 기록 3 개 이상에서 100 % 같음. 장부 `eval/l0_check.py` · `eval/results/l0_check_corpus.json` | 쌓는 중 -- sweagent 7 ✅ · cc_jsonl 1 · cc_stream 0 |
 
 ## 10. 잰 것 · 모르는 것
+
+- **차례 경계(CMD-T2) 실데이터**: 이 세션 JSONL 에서 `input.received` 7 · `turn.start` 6 · `turn.end` 5(여섯째 차례는 수집 시점에 열려 있었고,
+  일곱째 입력은 차례 중에 줄에 선 알림이다). JSONL 의 `turn.end` 는 **Stop 훅이 있어야** 나온다(그 요약 줄뿐이다) -- 훅이 없는 세션에서는 차례 끝을 못 본다.
+  cc_stream 실데이터는 없다(합성만). `source.closed` 는 캡처가 닫힘 줄을 적어야 나온다 -- Sensor `eval/run_claude.py`(Sensor 소유)가 아직 안 적는다.
 
 - 시험 33 개 통과. **변이 17 가지 모두 빨강**(`python3 eval/mutation.py`, 결과 `eval/mutation_results.json`) -- 해석 칸 넣기 · 우리 문턱 넣기 ·
   경과 시간으로 시간 초과 판정 · 결과 없음을 성공으로 · 예외 메시지 남김 · 오지 않은 결과 지어내기 · 보고된 null 을 못 봄으로 · 경로 평문 ·

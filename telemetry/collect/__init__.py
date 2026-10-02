@@ -77,11 +77,12 @@ class _Ledger:
         self.order: list = []
         self.tools: dict = {}
         self.tool_order: list = []
-        self.tail: list = []           # 실행 단위 사건 (type, at, data, nulls)
+        self.tail: list = []           # 실행 단위 사건 (줄, type, at, data, nulls)
+        self.line = 0                  # 지금 읽는 원천 줄 번호 -- 사건 순서(seq)는 원천에 나온 차례를 따른다
 
     def call(self, mid):
         if mid not in self.calls:
-            self.calls[mid] = {"t_start_ms": None, "t_end_ms": None, "tools": 0, "text": 0}
+            self.calls[mid] = {"t_start_ms": None, "t_end_ms": None, "tools": 0, "text": 0, "_line": self.line}
             self.order.append(mid)
         return self.calls[mid]
 
@@ -100,7 +101,7 @@ class _Ledger:
         self.tools[tid] = {"start": {"call_index": self.order.index(mid), "tool_name": name,
                                      "tool_head": tool_head(name, inp, self.h), "tool_sig": tool_sig(name, inp, self.h),
                                      "tool_input_chars": len(json.dumps(inp, ensure_ascii=False))},
-                           "t_issued": t, "end": None}
+                           "t_issued": t, "end": None, "line_start": self.line}
         self.tool_order.append(tid)
 
     def tool_result(self, block, t, extra=None, extra_nulls=()):
@@ -110,20 +111,18 @@ class _Ledger:
         end = {"is_error": bool(block.get("is_error")), "timed_out": _timed_out(d["start"]["tool_name"], block),
                "output_chars": _text_len(block.get("content"))}
         end.update(extra or {})
-        d["end"], d["t_result"], d["nulls"] = end, t, list(extra_nulls)
+        d["end"], d["t_result"], d["nulls"], d["line_end"] = end, t, list(extra_nulls), self.line
 
     def run_event(self, type, at, data, nulls=()):
-        self.tail.append((type, at, data, [k for k in nulls if data.get(k) is None]))
+        self.tail.append((self.line, type, at, data, [k for k in nulls if data.get(k) is None]))
 
     def events(self) -> "list[dict]":
-        out = []
+        """원천에 나온 차례(줄 번호)로 늘어놓는다. 모형 호출은 첫 줄, 도구 시작 · 끝은 그 줄, 실행 단위 사건은 그 줄.
+        같은 줄이면 응답 → 도구 시작 → 도구 끝 → 실행 단위 사건."""
+        items = []                     # (줄, 등급, 넣은 차례, type, at, nulls, data)
 
-        def emit(type, at, nulls=(), **data):
-            out.append(make(type, self.run_id, len(out), self.source, at=at, time_base=self.tb,
-                            reported_null=nulls, **data))
-        by_call: dict = {}
-        for j, tid in enumerate(self.tool_order):
-            by_call.setdefault(self.tools[tid]["start"]["call_index"], []).append((j, tid))
+        def put(line, rank, type, at, nulls, data):
+            items.append((line, rank, len(items), type, at, nulls, data))
         for i, mid in enumerate(self.order):
             c = self.calls[mid]
             vals = {k: c.get(k) for k in ("model", "t_start_ms", "t_end_ms", "stop_reason", "thinking_duration_ms",
@@ -137,18 +136,19 @@ class _Ledger:
             vals.update(call_index=i, tool_calls_per_message=c["tools"], output_text_chars=c["text"])
             if isinstance(mid, str):
                 vals["response_id"] = mid
-            emit("llm.response", c["t_end_ms"], [k for k in nl if vals.get(k) is None], **vals)
-            ts = by_call.get(i, [])
-            for j, tid in ts:
-                d = self.tools[tid]
-                emit("tool.start", d["t_issued"], tool_index=j, **d["start"])
-            for j, tid in ts:
-                d = self.tools[tid]
-                if d["end"] is not None:
-                    emit("tool.end", d["t_result"], [k for k in d["nulls"] if d["end"].get(k) is None],
-                         tool_index=j, **d["end"])
-        for type, at, data, nulls in self.tail:
-            emit(type, at, nulls, **data)
+            put(c["_line"], 0, "llm.response", c["t_end_ms"], [k for k in nl if vals.get(k) is None], vals)
+        for j, tid in enumerate(self.tool_order):
+            d = self.tools[tid]
+            put(d["line_start"], 1, "tool.start", d["t_issued"], [], dict(tool_index=j, **d["start"]))
+            if d["end"] is not None:
+                put(d.get("line_end", d["line_start"]), 2, "tool.end", d["t_result"],
+                    [k for k in d["nulls"] if d["end"].get(k) is None], dict(tool_index=j, **d["end"]))
+        for line, type, at, data, nulls in self.tail:
+            put(line, 3, type, at, nulls, data)
+        out = []
+        for _, _, _, type, at, nulls, data in sorted(items, key=lambda x: x[:3]):
+            out.append(make(type, self.run_id, len(out), self.source, at=at, time_base=self.tb,
+                            reported_null=nulls, **data))
         return out
 
 
@@ -156,7 +156,8 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
     L = _Ledger(run_id, "cc_jsonl", "unix_ms", hasher)
     last_ts = None
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for ln, line in enumerate(f):
+            L.line = ln
             try:
                 d = json.loads(line)
             except json.JSONDecodeError:
@@ -178,10 +179,30 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
                     "reported_cache_creation_input_tokens": tot("cacheCreationInputTokens")})
             if d.get("isSidechain"):
                 continue
+            t = _ts(d.get("timestamp"))
+            if d.get("type") == "queue-operation" and d.get("operation") == "enqueue":
+                # 런타임이 입력을 받아 줄에 세웠다 -- 차례가 시작되기 전이다(다른 operation 은 아직 옮기지 않는다)
+                c = d.get("content")
+                L.run_event("input.received", t, {"input_chars": len(c) if isinstance(c, str) else None})
+            elif d.get("type") == "system" and d.get("subtype") == "stop_hook_summary":
+                # 런타임의 Stop 사건. 훅이 막았으면(preventedContinuation) 차례는 끝나지 않고 이어진다
+                v, nl = _take(d, {"stop_hook_count": "hookCount"})
+                kind = "turn.continued" if d.get("preventedContinuation") is True else "turn.end"
+                L.run_event(kind, t, {"marker": "stop_hook_summary", **v}, nl)
             m = d.get("message")
             if not isinstance(m, dict):
                 continue
-            t = _ts(d.get("timestamp"))
+            content = m.get("content")
+            is_input = d.get("type") == "user" and not d.get("isMeta") and (
+                isinstance(content, str) or (isinstance(content, list) and content and not any(
+                    isinstance(b, dict) and b.get("type") == "tool_result" for b in content)))
+            if is_input:
+                # 입력이 대화에 들어갔다 -- 차례가 열린다. 글은 길이만
+                pos = d.get("turnPosition") if isinstance(d.get("turnPosition"), dict) else {}
+                v, nl = _take(pos, {"turn_index": "turnIndex", "prompt_index": "promptIndex"})
+                origin = d.get("turnOrigin") or ((d.get("origin") or {}).get("kind") if isinstance(d.get("origin"), dict)
+                                                 else None)
+                L.run_event("turn.start", t, {**v, "turn_origin": origin, "input_chars": _text_len(content)}, nl)
             if d.get("type") == "assistant" and m.get("id"):
                 c = L.call(m["id"])
                 L.seen(c, t)
@@ -220,8 +241,14 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
     cur = None
     with open(path, encoding="utf-8") as f:
         rows = [json.loads(x) for x in f if x.strip()]
-    for row in rows:
+    for ln, row in enumerate(rows):
+        L.line = ln
         t, d = row.get("_t"), row.get("line") or {}
+        if row.get("closed") is True:
+            # 수집기가 원천 프로세스의 흐름이 닫힌 것을 적었다(EOF · 종료 코드). 이 줄이 없으면 닫힘을 모른다
+            rc = row.get("returncode")
+            L.run_event("source.closed", t, {"exit_code": rc if isinstance(rc, int) else None})
+            continue
         ty = d.get("type")
         if d.get("parent_tool_use_id"):           # 하위 에이전트 사건은 뺀다
             continue
@@ -253,6 +280,8 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
                     c["stop_reason"] = delta.get("stop_reason")
                     if "stop_reason" in delta and delta["stop_reason"] is None:
                         c["sr_null"] = True
+        elif ty == "system" and d.get("subtype") == "init":
+            L.run_event("turn.start", t, {})        # claude -p: 프롬프트를 받고 세션을 연 런타임 선언 -- 차례 하나
         elif ty == "system" and d.get("subtype") == "thinking_tokens" and cur is not None:
             L.call(cur)["stream_thinking_estimate"] = d.get("estimated_tokens")
         elif ty == "assistant":
@@ -299,6 +328,7 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
             if v2 or n2:
                 L.run_event("runtime.limits", t, v2, n2)
             L.run_event("run.end", t, {**v, **v3}, n + n3)
+            L.run_event("turn.end", t, {"marker": "result"})
     return L.events()
 
 
@@ -309,6 +339,7 @@ def from_sweagent(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
         d = json.load(f)
     L = _Ledger(run_id, "sweagent", None, hasher)
     for i, s in enumerate(d.get("trajectory") or []):
+        L.line = i
         c = L.call(i)
         c["text"] = len(s.get("response") or "")
         act = s.get("action") or ""
@@ -322,5 +353,6 @@ def from_sweagent(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
     v, n = _take(info.get("model_stats") or {}, {"cost_usd": "instance_cost", "tokens_sent": "tokens_sent",
                                                   "tokens_received": "tokens_received", "api_calls": "api_calls"})
     v2, n2 = _take(info, {"terminal_reason": "exit_status"})
+    L.line = len(d.get("trajectory") or [])
     L.run_event("run.end", None, {**v, **v2}, n + n2)
     return L.events()

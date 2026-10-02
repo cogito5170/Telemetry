@@ -1,0 +1,115 @@
+"""BD-50 대조 장부 -- 실데이터 기록마다 Sensor 수집기와 L0 수집기(compat 경유)가 같은 꼴 v3 레코드를 내는지 맞대고 남긴다.
+
+    python3 eval/l0_check.py cc_jsonl <세션>.jsonl ...
+    python3 eval/l0_check.py sweagent <dir>/*.traj.gz
+    python3 eval/l0_check.py --summary
+
+옆에 ../Sensor 가 있어야 한다(llmsensor.telemetry.l0.compare 를 쓴다). 장부(eval/results/l0_check_corpus.json)에는
+**내용을 남기지 않는다**: 기록 식별자의 해시 · 파일 내용 해시 · 레코드 수 · 같은가 · 다르면 다른 칸 이름뿐.
+
+BD-50 기준: 수집기 셋(cc_jsonl · cc_stream · sweagent)마다 **서로 다른 기록** 3 개 이상에서 100 % 같다.
+'서로 다른 기록' 은 파일이 아니라 기록 식별자로 센다 -- 같은 세션 JSONL 을 시각을 달리해 두 번 재도 하나다.
+"""
+from __future__ import annotations
+
+import datetime
+import gzip
+import hashlib
+import json
+import pathlib
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+SENSOR = ROOT.parent / "Sensor"
+LEDGER = ROOT / "eval" / "results" / "l0_check_corpus.json"
+SOURCES = ("cc_jsonl", "cc_stream", "sweagent")
+NEED = 3
+
+
+def _h(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def recording_id(source: str, path: pathlib.Path) -> str:
+    """기록 식별자(해시). cc_jsonl: sessionId · cc_stream: init 의 session_id · sweagent: 파일 이름(인스턴스)."""
+    if source == "sweagent":
+        return _h(path.name.split(".")[0])
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if source == "cc_jsonl" and d.get("sessionId"):
+                return _h(d["sessionId"])
+            if source == "cc_stream":
+                ln = d.get("line") or {}
+                if ln.get("session_id"):
+                    return _h(ln["session_id"])
+    return _h(str(path.resolve()))          # 식별자가 없다 -- 경로로(같은 파일만 같은 기록)
+
+
+def content_hash(path: pathlib.Path) -> str:
+    op = gzip.open if path.suffix == ".gz" else open
+    with op(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:16]
+
+
+def _rev(repo: pathlib.Path) -> str:
+    p = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+    return p.stdout.strip() or "?"
+
+
+def load() -> list:
+    return json.loads(LEDGER.read_text(encoding="utf-8")) if LEDGER.exists() else []
+
+
+def summary(rows) -> dict:
+    out = {}
+    for s in SOURCES:
+        rs = [r for r in rows if r["source"] == s]
+        recs = {r["recording"] for r in rs}
+        bad = [r for r in rs if not r["same"]]
+        out[s] = {"recordings": len(recs), "checks": len(rs), "all_same": not bad,
+                  "meets_bd50": len(recs) >= NEED and not bad}
+    out["all_sources_meet_bd50"] = all(out[s]["meets_bd50"] for s in SOURCES)
+    return out
+
+
+def main(argv) -> int:
+    if argv[:1] == ["--summary"]:
+        print(json.dumps(summary(load()), ensure_ascii=False, indent=1))
+        return 0
+    source, paths = argv[0], [pathlib.Path(p) for p in argv[1:]]
+    if source not in SOURCES or not paths:
+        print(__doc__)
+        return 2
+    sys.path.insert(0, str(SENSOR))
+    sys.path.insert(0, str(ROOT))
+    from llmsensor.telemetry.l0 import compare
+    rows = load()
+    seen = {(r["source"], r["content"]) for r in rows}
+    revs = {"telemetry": _rev(ROOT), "sensor": _rev(SENSOR)}
+    for p in paths:
+        ch = content_hash(p)
+        if (source, ch) in seen:
+            continue
+        r = compare(source, str(p))
+        if not r.get("available"):
+            print("L0 Telemetry 를 못 찾았다")
+            return 2
+        row = {"source": source, "recording": recording_id(source, p), "content": ch, "native": r["native"],
+               "l0": r["l0"], "same": r["same"], "diff_fields": (r["first_diff"] or {}).get("fields", []),
+               "checked": datetime.date.today().isoformat(), **revs}
+        rows.append(row)
+        seen.add((source, ch))
+        print(("SAME " if r["same"] else "DIFF ") + f"{source} {row['recording']} {r['native']}/{r['l0']}")
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    LEDGER.write_text(json.dumps(rows, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps(summary(rows), ensure_ascii=False))
+    return 0 if all(r["same"] for r in rows) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
