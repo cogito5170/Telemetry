@@ -3,6 +3,9 @@
     python3 eval/l0_check.py cc_jsonl <세션>.jsonl ...
     python3 eval/l0_check.py sweagent <dir>/*.traj.gz
     python3 eval/l0_check.py --summary
+    python3 eval/l0_check.py <source> <파일> --same-run-as <다른 원천의 기록 id>
+        같은 실행을 다른 꼴로 남긴 기록(예: claude -p 의 stream 캡처와 그 자식 JSONL). 장부에는 남지만 BD-50 의
+        '서로 다른 기록' 수에는 넣지 않는다(baseline 판단 5945574690).
     python3 eval/l0_check.py --freeze <source> <파일> ...   Sensor 의 원래 수집기 출력 지문(고정 열쇠)을 장부 행에 얼린다
     python3 eval/l0_check.py --verify <source> <파일> ...   L0 경로로 다시 지어 얼린 지문과 맞댄다 -- 원래 수집기를 지운 뒤의 대조
     python3 eval/l0_check.py --reported <source> <보고한 세션> <내용 해시> <native> <l0> <same> <telemetry> <sensor>
@@ -120,7 +123,7 @@ def summary(rows) -> dict:
     out = {}
     for s in SOURCES:
         rs = [r for r in rows if r["source"] == s]
-        recs = {r["recording"] for r in rs}
+        recs = {r["recording"] for r in rs if not r.get("same_run_as")}     # 같은 실행의 다른 꼴은 독립 기록이 아니다
         bad = [r for r in rs if not r["same"]]
         out[s] = {"recordings": len(recs), "checks": len(rs), "all_same": not bad,
                   "meets_bd50": len(recs) >= NEED and not bad}
@@ -146,6 +149,11 @@ def main(argv) -> int:
     if argv[:1] == ["--summary"]:
         print(json.dumps(summary(load()), ensure_ascii=False, indent=1))
         return 0
+    same_run = None
+    if "--same-run-as" in argv:
+        i = argv.index("--same-run-as")
+        same_run = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
     source, paths = argv[0], [pathlib.Path(p) for p in argv[1:]]
     if source not in SOURCES or not paths:
         print(__doc__)
@@ -167,6 +175,10 @@ def main(argv) -> int:
         row = {"source": source, "recording": recording_id(source, p), "content": ch, "native": r["native"],
                "l0": r["l0"], "same": r["same"], "diff_fields": (r["first_diff"] or {}).get("fields", []),
                "checked": datetime.date.today().isoformat(), **revs}
+        if r.get("against"):
+            row["against"] = r["against"]
+        if same_run:
+            row["same_run_as"] = same_run
         rows.append(row)
         seen.add((source, ch))
         print(("SAME " if r["same"] else "DIFF ") + f"{source} {row['recording']} {r['native']}/{r['l0']}")

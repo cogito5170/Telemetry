@@ -192,5 +192,60 @@
   "sensor": "2806943",
   "v3_digest": "4cdbfa1662710559",
   "frozen_sensor": "f6f02fc"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "a076db0f7428d116",
+  "content": "2b09fc34f9cab059",
+  "native": null,
+  "l0": 2,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "3fa7147",
+  "sensor": "dc0bc2e",
+  "against": "invariants",
+  "same_run_as": "cc_stream:a076db0f7428d116"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "94bd45e1de9affd6",
+  "content": "4cca5388cc2d5578",
+  "native": null,
+  "l0": 4,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "3fa7147",
+  "sensor": "dc0bc2e",
+  "against": "invariants",
+  "same_run_as": "cc_stream:94bd45e1de9affd6"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "813498b2eeefa0a1",
+  "content": "9fca8b4734ba5b2d",
+  "native": null,
+  "l0": 4,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "3fa7147",
+  "sensor": "dc0bc2e",
+  "against": "invariants",
+  "same_run_as": "cc_stream:813498b2eeefa0a1"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "61f1a9387beb35bc",
+  "content": "3b833ca1d096db63",
+  "native": 631,
+  "l0": 631,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "unknown",
+  "sensor": "unknown",
+  "reported_by": "MS"
  }
 ]

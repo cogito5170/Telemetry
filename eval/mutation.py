@@ -99,6 +99,10 @@ MUTANTS = [
      '                        merged = dict(c.get("_start_usage") or {})', '                        merged = {}'),
     ("compat 이 꼴 v3 칸 순서를 바꿈(얼린 출력과 달라진다)", "telemetry/compat.py",
      'RUN = ("model", "run_duration_ms",', 'RUN = ("run_duration_ms", "model",'),
+    ("T10: tool_progress 를 다시 하위 에이전트로 거름", "telemetry/collect/__init__.py",
+     '        if d.get("parent_tool_use_id") and not _main_progress(d, L):', '        if d.get("parent_tool_use_id"):'),
+    ("T10: 하위 에이전트 도구의 진행도 남김", "telemetry/collect/__init__.py",
+     "    return ref in L.tools\n", "    return True\n"),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]
