@@ -141,7 +141,8 @@ EVENTS: "dict[str, dict[str, F]]" = {
     # 요금 한도는 실행이 아니라 **계정**의 것이다(BD-32) -- 실행 실체에 달면 '이 실행이 소모했다' 로 잘못 읽힌다. 실체는 L2 가 정한다
     "provider.rate_limit": {
         "utilization": _f("num", R), "declared_status": _f("str", D, "런타임의 상태 문자열 그대로(allowed_warning · rejected ...)"),
-        "declared_threshold": _f("num", D), "resets_at_ms": _f("num", D),
+        "declared_threshold": _f("num", D),
+        "resets_at_ms": _f("num", D, "런타임이 선언한 한도 재설정 시각(unix ms). 원천 resetsAt 은 unix **초** -- 단위만 옮긴다"),
         "limit_type": _f("str", D, "한도의 종류 이름 그대로(five_hour ...)"),
         "overage_status": _f("str", D), "overage_disabled_reason": _f("str", D),
         "fallback_available": _f("bool", D, "런타임이 대체 경로가 있다고 선언했나"),

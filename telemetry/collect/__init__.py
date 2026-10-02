@@ -174,6 +174,19 @@ class _Ledger:
         return out
 
 
+def _resets_at(src: dict) -> "tuple[dict, list]":
+    """CMD-T14: resetsAt(unix 초, 실기록 cc_jsonl quotaLimits · cc_stream rate_limit_info 둘 다) -> resets_at_ms.
+    키가 없으면 못 봄, null 이면 보고된 null, 수가 아니면 못 봄(짐작해 바꾸지 않는다)."""
+    if "resetsAt" not in src:
+        return {}, []
+    v = src["resetsAt"]
+    if v is None:
+        return {}, ["resets_at_ms"]
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return {"resets_at_ms": v * 1000}, []
+    return {}, []
+
+
 def _compaction(meta) -> "tuple[dict, list]":
     """compact_boundary 의 메타. JSONL 은 camelCase, SDK stream 은 snake_case(stream 꼴은 실기록으로 확인 못 함)."""
     meta = meta if isinstance(meta, dict) else {}
@@ -203,6 +216,9 @@ def _api_error(L, d, t):
         v, n = _take(q, {"declared_status": "status", "limit_type": "rateLimitType", "overage_status": "overageStatus",
                          "overage_disabled_reason": "overageDisabledReason",
                          "fallback_available": "unifiedRateLimitFallbackAvailable"})
+        rv, rn = _resets_at(q)
+        v.update(rv)
+        n = n + rn
         L.run_event("provider.rate_limit", t, v, n)
     L.run_event("turn.end", t, {"marker": "api_error", "error_type": err})
 
@@ -398,9 +414,14 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
                     L.tool_result(b, t, ex, tn, tur)
         elif ty == "rate_limit_event":
             info = d.get("rate_limit_info") or {}
+            rv, rn = _resets_at(info)
+            # 실기록 rate_limit_info 키(CMD-T14 확인): rateLimitType · overageStatus · overageDisabledReason 도 온다 -- 못 봄으로 적지 않는다
+            ov, on = _take(info, {"limit_type": "rateLimitType", "overage_status": "overageStatus",
+                                  "overage_disabled_reason": "overageDisabledReason"})
             L.run_event("provider.rate_limit", t, {"utilization": info.get("utilization"),
                                                    "declared_status": info.get("status"),
-                                                   "declared_threshold": info.get("surpassedThreshold")})
+                                                   "declared_threshold": info.get("surpassedThreshold"), **rv, **ov},
+                        rn + on)
         elif ty == "autocompact_state":
             L.run_event("runtime.limits", t, {"autocompact_threshold": (d.get("value") or {}).get("threshold")})
         elif ty == "result":

@@ -110,6 +110,12 @@ MUTANTS = [
     ("T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)", "telemetry/collect/__init__.py",
      'elif d.get("type") == "assistant" and m.get("model") == "<synthetic>":\n                pass',
      'elif d.get("type") == "assistant" and m.get("model") == "<synthetic>":\n                L.run_event("turn.end", t, {"marker": "synthetic"})'),
+    ("T14: 초를 그대로 ms 로 적음", "telemetry/collect/__init__.py",
+     '        return {"resets_at_ms": v * 1000}, []', '        return {"resets_at_ms": v}, []'),
+    ("T14: resetsAt 을 안 읽음(못 봄으로 잘못 적음)", "telemetry/collect/__init__.py",
+     '    if "resetsAt" not in src:\n        return {}, []', '    if True:\n        return {}, []'),
+    ("T14: stream 의 한도 종류를 안 읽음", "telemetry/collect/__init__.py",
+     '            ov, on = _take(info, {"limit_type": "rateLimitType",', '            ov, on = _take(info, {"limit_type_x": "rateLimitType",'),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]

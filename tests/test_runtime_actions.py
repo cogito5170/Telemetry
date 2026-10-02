@@ -20,7 +20,7 @@ def ts(n):
     return f"2026-10-02T00:00:{n:02d}Z"
 
 
-QUOTA = {"status": "rejected", "rateLimitType": "five_hour", "overageStatus": "rejected",
+QUOTA = {"status": "rejected", "rateLimitType": "five_hour", "overageStatus": "rejected", "resetsAt": 1790900000,
          "overageDisabledReason": "out_of_credits", "unifiedRateLimitFallbackAvailable": False}
 SESSION = [
     {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(1), "content": "go"},
@@ -138,6 +138,35 @@ class StreamRuntimeActions(unittest.TestCase):
         c = _of(evs, "runtime.compaction")[0]
         self.assertEqual((c["data"]["trigger"], c["data"]["pre_tokens"]), ("manual", 5000))
         self.assertIn("post_tokens", c["unobserved"])
+
+
+class ResetsAt(unittest.TestCase):
+    """CMD-T14: 원천 resetsAt(unix 초) -> resets_at_ms. 키가 없으면 못 봄, null 이면 보고된 null."""
+
+    def _stream(self, info):
+        rows = [{"_t": 0, "line": {"type": "system", "subtype": "init"}},
+                {"_t": 5, "line": {"type": "rate_limit_event", "rate_limit_info": info}}]
+        with tempfile.TemporaryDirectory() as d:
+            return _of(from_cc_stream(_write(d, "r.stream.jsonl", rows), "s", Hasher(KEY)), "provider.rate_limit")[0]
+
+    def test_stream_seconds_to_ms(self):
+        e = self._stream({"status": "allowed_warning", "utilization": 0.8, "resetsAt": 1790913600,
+                          "rateLimitType": "five_hour", "isUsingOverage": False, "surpassedThreshold": 0.75})
+        self.assertEqual(check(e), [])
+        self.assertEqual(e["data"]["resets_at_ms"], 1790913600000)
+        self.assertEqual((e["data"]["limit_type"], e["data"]["overage_status"]), ("five_hour", None))
+        self.assertIn("overage_status", e["unobserved"])                # 이 줄에는 없었다
+
+    def test_missing_null_and_odd(self):
+        self.assertIn("resets_at_ms", self._stream({"status": "allowed"})["unobserved"])
+        self.assertIn("resets_at_ms", self._stream({"status": "allowed", "resetsAt": None})["reported_null"])
+        self.assertIn("resets_at_ms", self._stream({"status": "allowed", "resetsAt": "soon"})["unobserved"])
+
+    def test_jsonl_quota_limits(self):
+        with tempfile.TemporaryDirectory() as d:
+            evs = from_cc_jsonl(_write(d, "s.jsonl", SESSION), "x", Hasher(KEY))
+        rl = _of(evs, "provider.rate_limit")[0]["data"]
+        self.assertEqual(rl["resets_at_ms"], 1790900000 * 1000)
 
 
 class ToolProgressHeartbeats(unittest.TestCase):

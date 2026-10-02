@@ -102,7 +102,7 @@
  {
   "mutant": "isMeta 줄을 입력으로",
   "red": true,
-  "tail": "FAILED (failures=1, errors=1)"
+  "tail": "FAILED (failures=2, errors=1)"
  },
  {
   "mutant": "닫힘 표시 없이 파일 끝을 닫힘으로",
@@ -137,7 +137,7 @@
  {
   "mutant": "D2: 429 줄을 모형 호출로",
   "red": true,
-  "tail": "FAILED (failures=2, errors=2)"
+  "tail": "FAILED (failures=2, errors=3)"
  },
  {
   "mutant": "D2: <synthetic> 줄을 모형 호출로",
@@ -203,6 +203,21 @@
   "mutant": "T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)",
   "red": true,
   "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T14: 초를 그대로 ms 로 적음",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "T14: resetsAt 을 안 읽음(못 봄으로 잘못 적음)",
+  "red": true,
+  "tail": "FAILED (failures=5)"
+ },
+ {
+  "mutant": "T14: stream 의 한도 종류를 안 읽음",
+  "red": true,
+  "tail": "FAILED (failures=2, errors=1)"
  },
  {
   "mutant": "L0 가 위층을 import",
