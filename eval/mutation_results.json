@@ -1,0 +1,87 @@
+[
+ {
+  "mutant": "해석 칸 하나를 목록에 넣음",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "우리 문턱을 measured 로 넣음",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "Recorder 가 경과 시간으로 시간 초과를 판정",
+  "red": true,
+  "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutant": "결과 없음을 성공으로 메움",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "예외 메시지를 남김",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "다른 도구의 시간 초과를 False 로 메움",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "오지 않은 결과를 지어냄",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "보고된 null 을 못 봄으로",
+  "red": true,
+  "tail": "FAILED (failures=7)"
+ },
+ {
+  "mutant": "하위 에이전트 줄을 섞음",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "겨냥 경로를 평문으로",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "OpenAI 입력에서 캐시를 안 뺌",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "표에 없는 오류를 추측",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "0 을 못 봄으로",
+  "red": true,
+  "tail": "FAILED (failures=5, errors=3)"
+ },
+ {
+  "mutant": "봉투를 연다(모르는 칸 허용)",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "compat 이 보고된 null 을 버림",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "compat 이 마지막이 아니라 첫 요금 한도 사건을 씀",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "L0 가 위층을 import",
+  "red": true,
+  "tail": "FAILED (failures=2)"
+ }
+]

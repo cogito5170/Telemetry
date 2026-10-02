@@ -1,0 +1,106 @@
+import unittest
+
+from telemetry import MemorySink, Recorder
+from telemetry.event import check
+from telemetry.usage import otel_usage
+
+
+class Clock:
+    def __init__(self):
+        self.t = 1_000.0
+
+    def __call__(self):
+        return self.t
+
+
+def rec():
+    clk = Clock()
+    s = MemorySink()
+    return Recorder("r17", s, source="inproc:test", wall=clk, mono=clk), s, clk
+
+
+class Tools(unittest.TestCase):
+    def test_result_given(self):
+        r, s, clk = rec()
+        with r.tool("Bash", {"command": "make all"}, call_index=0) as t:
+            clk.t += 250
+            t.result(exit_code=2, is_error=True, output="boom")
+        st, en = s.events
+        self.assertEqual((st["type"], en["type"], st["data"]["tool_head"]), ("tool.start", "tool.end", "Bash:make"))
+        self.assertEqual((en["data"]["elapsed_ms"], en["data"]["exit_code"], en["data"]["output_chars"]), (250, 2, 4))
+        self.assertEqual([check(e) for e in s.events], [[], []])
+
+    def test_no_result_is_unobserved_not_success(self):
+        r, s, _ = rec()
+        with r.tool("Read", {"file_path": "/a"}):
+            pass
+        self.assertIn("is_error", s.events[-1]["unobserved"])
+
+    def test_exception_is_observed_and_reraised(self):
+        r, s, _ = rec()
+        with self.assertRaises(TimeoutError):
+            with r.tool("Bash", {"command": "sleep 9"}):
+                raise TimeoutError("secret message")
+        d = s.events[-1]["data"]
+        self.assertEqual((d["exception"], d["is_error"]), ("TimeoutError", True))
+        self.assertNotIn("secret", str(s.events))                     # 메시지는 남기지 않는다
+        self.assertIsNone(d["timed_out"])                              # 예외 이름을 시간 초과 판정으로 바꾸지 않는다
+
+    def test_executor_may_declare_its_own_timeout(self):
+        r, s, _ = rec()
+        with r.tool("Bash", {"command": "sleep 9"}) as t:
+            t.result(timed_out=True)                                  # 실행기 스스로 끊었다 -- 선언
+        self.assertTrue(s.events[-1]["data"]["timed_out"])
+
+
+class Llm(unittest.TestCase):
+    def test_response_usage_normalised(self):
+        r, s, _ = rec()
+        r.llm_response(0, "openai", usage={"prompt_tokens": 1200, "prompt_tokens_details": {"cached_tokens": 200},
+                                           "completion_tokens": 430}, status_code=200, elapsed_ms=1840)
+        d = s.events[-1]["data"]
+        self.assertEqual((d["input_tokens"], d["cache_read_input_tokens"], d["output_tokens"]), (1000, 200, 430))
+        self.assertIn("cache_creation_input_tokens", s.events[-1]["unobserved"])
+        self.assertEqual(otel_usage(d), {"gen_ai.usage.cache_read.input_tokens": 200, "gen_ai.usage.output_tokens": 430})
+        r.llm_response(1, "gemini", usage={"prompt_token_count": 100, "cached_content_token_count": 40,
+                                           "candidates_token_count": 10, "thoughts_token_count": 5})
+        d = s.events[-1]["data"]
+        self.assertEqual((d["input_tokens"], d["output_tokens"], d["thinking_tokens"]), (60, 15, 5))
+
+    def test_error_is_translated_not_judged(self):
+        r, s, _ = rec()
+        r.llm_error(0, "anthropic", 429, {"error": {"type": "rate_limit_error"}}, {"Retry-After": "7"}, attempt=2)
+        d = s.events[-1]["data"]
+        self.assertEqual((d["error_code"], d["http_status"], d["provider_code"], d["retry_after_ms"], d["attempt"]),
+                         ("RATE_LIMITED", 429, "rate_limit_error", 7000, 2))
+        r.llm_error(0, "gemini", 504, {"error": {"status": "DEADLINE_EXCEEDED", "details": [
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "1.5s"}]}})
+        d = s.events[-1]["data"]
+        self.assertEqual((d["error_code"], d["retry_after_ms"]), ("DEADLINE_EXCEEDED", 1500))
+        r.llm_error(0, "openai", 500)
+        self.assertEqual(s.events[-1]["data"]["error_code"], "UNKNOWN")      # 표에 없으면 추측하지 않는다
+
+
+class ClosedLoop(unittest.TestCase):
+    def test_action_result_returns_to_l0(self):
+        """Action 의 결과는 다시 Telemetry 로. 결정의 **내용**은 없고 id 만 잇는다."""
+        r, s, clk = rec()
+        with r.action("RETURN", decision_ref="dc-abc", target="/fleet/drone7") as a:
+            clk.t += 90
+            a.result(status_code=200)
+        disp, res = s.events
+        self.assertEqual((disp["data"]["action_ref"], res["data"]["action_ref"]), ("r17/a0", "r17/a0"))
+        self.assertEqual((disp["data"]["decision_ref"], res["data"]["elapsed_ms"]), ("dc-abc", 90))
+        self.assertTrue(disp["data"]["target"].startswith("#"))
+        self.assertIn("is_error", res["unobserved"])
+
+    def test_heartbeat_counts_per_emitter(self):
+        r, s, _ = rec()
+        for w in ("a", "b", "a"):
+            r.heartbeat(w)
+        self.assertEqual([(e["data"]["emitter"], e["data"]["beat"]) for e in s.events], [("a", 0), ("b", 0), ("a", 1)])
+        self.assertEqual([e["seq"] for e in s.events], [0, 1, 2])
+
+
+if __name__ == "__main__":
+    unittest.main()
