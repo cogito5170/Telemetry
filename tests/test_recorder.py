@@ -148,6 +148,61 @@ class ClosedLoop(unittest.TestCase):
         self.assertTrue(disp["data"]["target"].startswith("#"))
         self.assertIn("is_error", res["unobserved"])
 
+    def test_external_action_ref_is_carried(self):
+        """CMD-T16: 실행기의 command_id 를 그대로 싣는다 -- L0 에서 명령 -> 의도 -> 결정으로 거슬러 갈 수 있게."""
+        r, s, _ = rec()
+        with r.action("RETURN", decision_ref="dec-0123456789abcdef", action_ref="cmd-89abcdef01234567") as a:
+            a.result(is_error=False)
+        disp, res = s.events
+        self.assertEqual((disp["data"]["action_ref"], res["data"]["action_ref"]),
+                         ("cmd-89abcdef01234567", "cmd-89abcdef01234567"))
+        self.assertEqual([check(e) for e in s.events], [[], []])
+        with r.action("HOLD"):                                         # 안 주면 지금과 같다 -- 밖의 ref 가 번호를 먹지 않는다
+            pass
+        self.assertEqual(s.events[-1]["data"]["action_ref"], "r17/a0")
+
+    def test_sequential_repeat_of_same_ref_is_recorded(self):
+        """같은 명령을 차례로 다시 실행 -- 둘 다 적는다(되풀이는 관측, 해석은 위층)."""
+        r, s, _ = rec()
+        for code in (503, 200):
+            with r.action("RETURN", action_ref="cmd-x") as a:
+                a.result(status_code=code)
+        self.assertEqual([(e["type"], e["data"]["action_ref"]) for e in s.events],
+                         [("action.dispatch", "cmd-x"), ("action.result", "cmd-x")] * 2)
+
+    def test_overlapping_same_ref_refused_before_any_event(self):
+        """결과 전에 같은 ref 를 또 열면 짝을 지을 수 없다 -- 사건을 내기 전에 거절하고, 먼저 연 것은 그대로 닫힌다."""
+        r, s, _ = rec()
+        with r.action("RETURN", action_ref="cmd-x"):
+            with self.assertRaises(ValueError):
+                with r.action("RETURN", action_ref="cmd-x"):
+                    pass
+            self.assertEqual([e["type"] for e in s.events], ["action.dispatch"])
+        self.assertEqual([e["type"] for e in s.events], ["action.dispatch", "action.result"])
+        with r.action("RETURN", action_ref="cmd-x"):                  # 닫힌 뒤에는 다시 연다
+            pass
+        with r.action("A", action_ref="r17/a0"):                       # 지은 ref 와 겹쳐도 같은 규칙
+            with self.assertRaises(ValueError):
+                with r.action("B"):
+                    pass
+
+    def test_exception_closes_the_ref(self):
+        r, s, _ = rec()
+        with self.assertRaises(RuntimeError):
+            with r.action("RETURN", action_ref="cmd-x"):
+                raise RuntimeError("boom")
+        self.assertEqual(s.events[-1]["data"]["exception"], "RuntimeError")
+        with r.action("RETURN", action_ref="cmd-x"):
+            pass
+
+    def test_bad_action_ref_refused(self):
+        r, s, _ = rec()
+        for bad in ("", 7, b"cmd"):
+            with self.assertRaises(ValueError):
+                with r.action("RETURN", action_ref=bad):
+                    pass
+        self.assertEqual(s.events, [])
+
     def test_heartbeat_counts_per_emitter(self):
         r, s, _ = rec()
         for w in ("a", "b", "a"):

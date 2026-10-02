@@ -84,7 +84,7 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 | `input.removed` | 줄에 선 입력을 런타임이 뺌(까닭 그대로: absorbed_mid_turn …) -- 그 입력은 새 차례를 열지 않는다 | cc_jsonl(`queue-operation remove`) | liveness |
 | `runtime.compaction` | 런타임이 맥락을 압축함 -- trigger(auto · manual) · 전후 토큰 · 걸린 시간 | cc_jsonl(`compact_boundary.compactMetadata`) · cc_stream(SDK 꼴 `compact_metadata`, 실기록 미확인) | context · action_outcome |
 | `dependency.probe` | 의존 대상 탐침 -- 상태 코드 · 오류 코드 · 경과 | Recorder | **dependency**(새) |
-| `action.dispatch` · `action.result` | 실행기가 **실제로 실행한** 행동과 그 결과. 결정과는 `decision_ref`(id)로만 잇는다 | Recorder | **action_outcome**(새) |
+| `action.dispatch` · `action.result` | 실행기가 **실제로 실행한** 행동과 그 결과. 결정과는 `decision_ref`(id)로만 잇는다. `action_ref` 는 실행기의 명령 id(action-contract/1 `command_id`, CMD-T16)를 받고, 안 주면 Recorder 가 짓는다. 같은 ref 를 차례로 되풀이하면 둘 다 적고, 결과 전에 겹쳐 열면 거절한다 | Recorder | **action_outcome**(새) |
 
 앞으로 더할 liveness · recovery · dependency · action_outcome 도 같은 길(L0 → L1 → L2)을 지난다. 그 L1 팩은 아직 없다.
 

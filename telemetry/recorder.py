@@ -7,8 +7,11 @@
         p = subprocess.run(...)
         t.result(exit_code=p.returncode, is_error=p.returncode != 0, output=p.stdout)
     rec.heartbeat("worker-1")
-    with rec.action("RETURN", decision_ref=dc_id) as a:  # action.dispatch / action.result -- 결과가 다시 L0 로(닫힌 고리)
-        ...
+    with rec.action("RETURN", decision_ref=dec.id, action_ref=cmd.command_id) as a:  # action.dispatch / action.result
+        ...                                              # -- 결과가 다시 L0 로(닫힌 고리)
+
+`decision_ref` 는 결정 기록 id(MS `DecisionRecord.id`), `action_ref` 는 실행기의 명령 id(action-contract/1
+`ActionCommand.command_id`). `action_ref` 를 안 주면 Recorder 가 `<run_id>/a<n>` 을 짓는다.
 
 **판단하지 않는다.** `tool()` 은 시간 초과를 정하지 않는다 -- 경과 시간을 잴 뿐이다. 실행기가 스스로 시간 초과로 끊었으면
 그 사실을 `timed_out=True`(선언)로 넘긴다. 예외가 나면 예외 종류 이름만 적고(`exception`), 메시지는 남기지 않는다.
@@ -36,6 +39,7 @@ class Recorder:
         self._seq = itertools.count()
         self._tool = itertools.count()
         self._act = itertools.count()
+        self._open_acts: set = set()     # 아직 action.result 를 내지 않은 action_ref
         self._beats: dict = {}
 
     def emit(self, type: str, reported_null=(), **data) -> dict:
@@ -126,10 +130,22 @@ class Recorder:
 
     # ── 행동 -- 결정의 내용은 적지 않는다. 무엇이 실행됐고 어떻게 끝났나만 ──
     @contextmanager
-    def action(self, action_type: str, decision_ref=None, target=None):
-        ref = f"{self.run_id}/a{next(self._act)}"
+    def action(self, action_type: str, decision_ref=None, target=None, action_ref: "str | None" = None):
+        """action_ref: 밖에서 준 행동 id(CMD-T16 -- 실행기의 command_id). 없으면 `<run_id>/a<n>` 을 짓는다.
+        같은 ref 를 **차례로** 다시 쓰는 것(같은 명령의 되풀이)은 받는다 -- 되풀이도 관측이고 해석은 위층이 한다.
+        같은 ref 가 **아직 열려 있는데**(결과 전) 또 열면 ValueError, 사건을 내기 전에 -- dispatch 와 result 를
+        ref 로 짝지을 수 없게 되기 때문이다."""
+        if action_ref is None:
+            ref = f"{self.run_id}/a{next(self._act)}"
+        elif isinstance(action_ref, str) and action_ref:
+            ref = action_ref
+        else:
+            raise ValueError(f"action_ref 는 빈 문자열이 아닌 str 이어야 한다 ({action_ref!r})")
+        if ref in self._open_acts:
+            raise ValueError(f"action_ref {ref!r} 가 아직 열려 있다(결과 전) -- 짝을 지을 수 없다")
         self.emit("action.dispatch", action_ref=ref, decision_ref=decision_ref, action_type=action_type,
                   target=target_hash(target, self.h))
+        self._open_acts.add(ref)
         h = _Outcome()
         t0 = self.mono()
         try:
@@ -139,6 +155,7 @@ class Recorder:
             h.vals.setdefault("is_error", True)
             raise
         finally:
+            self._open_acts.discard(ref)
             self.emit("action.result", action_ref=ref, elapsed_ms=self.mono() - t0, **h.vals)
 
 

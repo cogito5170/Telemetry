@@ -255,6 +255,31 @@
   "tail": "FAILED (failures=5, errors=1)"
  },
  {
+  "mutant": "T16: 밖의 action_ref 를 버리고 늘 짓는다",
+  "red": true,
+  "tail": "FAILED (failures=6)"
+ },
+ {
+  "mutant": "T16: 밖의 ref 도 번호를 먹는다(안 준 실행이 지금과 달라짐)",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "T16: 열린 ref 를 또 열어도 받음(짝을 못 지음)",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T16: 끝난 ref 를 안 닫음(차례 되풀이를 거절)",
+  "red": true,
+  "tail": "FAILED (failures=2, errors=3)"
+ },
+ {
+  "mutant": "T16: 빈 action_ref 를 받음",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
   "mutant": "L0 가 위층을 import",
   "red": true,
   "tail": "FAILED (failures=4)"
