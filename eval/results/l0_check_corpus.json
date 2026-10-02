@@ -119,5 +119,18 @@
   "telemetry": "780867b",
   "sensor": "92cc46b",
   "reported_by": "baseline"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "a9a9395039a835f0",
+  "content": "b56e30905bad7da9",
+  "native": 306,
+  "l0": 306,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "564785d",
+  "sensor": "38892cd",
+  "reported_by": "baseline"
  }
 ]
