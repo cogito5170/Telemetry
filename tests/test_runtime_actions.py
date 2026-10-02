@@ -29,18 +29,22 @@ SESSION = [
     {"type": "assistant", "timestamp": ts(3), "message": {"id": "m1", "model": "claude-x", "usage": {
         "input_tokens": 10, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "output_tokens": 3},
         "content": [{"type": "text", "text": "hi"}]}},
-    # D2: 429 -- 런타임이 끼운 API 오류 줄(모형 호출이 아니다)
-    {"type": "assistant", "timestamp": ts(4), "isApiErrorMessage": True, "apiErrorStatus": 429, "error": "rate_limit",
+    {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(4), "content": "또"},
+    {"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "timestamp": ts(5)},
+    # D2 · T11: 429 -- 런타임이 끼운 API 오류 줄(모형 호출이 아니다). 차례가 여기서 끝난다(Claude Code StopFailure 계약)
+    {"type": "assistant", "timestamp": ts(6), "isApiErrorMessage": True, "apiErrorStatus": 429, "error": "rate_limit",
      "quotaLimits": QUOTA, "message": {"id": "e1", "model": "<synthetic>", "usage": {"input_tokens": 0, "output_tokens": 0},
                                        "content": [{"type": "text", "text": "API Error: rate limit"}]}},
-    {"type": "assistant", "timestamp": ts(5), "message": {"id": "s1", "model": "<synthetic>", "usage": {},
+    {"type": "assistant", "timestamp": ts(7), "message": {"id": "s1", "model": "<synthetic>", "usage": {},
                                                          "content": [{"type": "text", "text": "No response requested."}]}},
-    {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(6), "content": "또"},
-    {"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "timestamp": ts(7)},
+    # 사람을 기다린 뒤 다음 차례
+    {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(40), "content": "다시"},
+    {"type": "user", "timestamp": ts(41), "turnOrigin": "human", "turnPosition": {"promptIndex": 2, "turnIndex": 2},
+     "message": {"role": "user", "content": "다시"}},
     # D4: 압축
-    {"type": "system", "subtype": "compact_boundary", "timestamp": ts(8),
+    {"type": "system", "subtype": "compact_boundary", "timestamp": ts(42),
      "compactMetadata": {"trigger": "auto", "preTokens": 783484, "postTokens": 7209, "durationMs": 69703}},
-    {"type": "system", "subtype": "stop_hook_summary", "timestamp": ts(9), "hookCount": 1, "preventedContinuation": False},
+    {"type": "system", "subtype": "stop_hook_summary", "timestamp": ts(43), "hookCount": 1, "preventedContinuation": False},
 ]
 STREAM = [
     {"_t": 0, "line": {"type": "system", "subtype": "init"}},
@@ -99,8 +103,19 @@ class JsonlRuntimeActions(unittest.TestCase):
         c = _of(self.evs, "runtime.compaction")[0]["data"]
         self.assertEqual((c["trigger"], c["pre_tokens"], c["post_tokens"], c["duration_ms"]), ("auto", 783484, 7209, 69703))
         self.assertEqual(_of(self.evs, "input.removed")[0]["data"]["reason"], "absorbed_mid_turn")
-        self.assertEqual(len(_of(self.evs, "input.received")), 2)
-        self.assertEqual(len(_of(self.evs, "turn.start")), 1)         # 흡수된 입력은 새 차례를 열지 않았다
+        self.assertEqual(len(_of(self.evs, "input.received")), 3)
+        self.assertEqual(len(_of(self.evs, "turn.start")), 2)         # 흡수된 입력은 새 차례를 열지 않았다
+
+    def test_turn_ended_by_api_error_is_closed(self):
+        """CMD-T11: 429 로 끝난 차례는 그 오류 줄에서 닫힌다(Stop 훅은 돌지 않는다). 사람을 기다린 시간이 차례 중이 아니다."""
+        seq = [(e["type"], e["data"].get("marker"), e["data"].get("turn_index"))
+               for e in self.evs if e["type"] in ("turn.start", "turn.end")]
+        self.assertEqual(seq, [("turn.start", None, 1), ("turn.end", "api_error", None),
+                               ("turn.start", None, 2), ("turn.end", "stop_hook_summary", None)])
+        end = [e for e in _of(self.evs, "turn.end") if e["data"]["marker"] == "api_error"][0]
+        self.assertEqual(end["data"]["error_type"], "rate_limit")
+        err = _of(self.evs, "llm.error")[0]
+        self.assertLess(err["seq"], end["seq"])                       # 오류 사건 뒤에 차례 끝
 
     def test_v3_run_record_carries_the_429(self):
         run = [r for r in to_sensor_records(self.evs) if r["kind"] == "run"][0]

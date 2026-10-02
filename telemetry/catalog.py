@@ -124,8 +124,9 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "input_chars": _f("int", M),
     },
     "turn.end": {
-        "marker": _f("str", R, "끝을 선언한 원천 줄의 종류(stop_hook_summary · result)"),
+        "marker": _f("str", R, "끝을 선언한 원천 줄의 종류(stop_hook_summary · result · api_error)"),
         "stop_hook_count": _f("int", R),
+        "error_type": _f("str", R, "API 오류로 끝났을 때 원천의 오류 이름 그대로(rate_limit … -- Claude Code StopFailure 의 error_type 과 같은 어휘)"),
     },
     "turn.continued": {
         "marker": _f("str", R), "stop_hook_count": _f("int", R, "Stop 훅이 끝을 막아 차례가 이어졌다"),

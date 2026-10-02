@@ -137,7 +137,7 @@
  {
   "mutant": "D2: 429 줄을 모형 호출로",
   "red": true,
-  "tail": "FAILED (failures=1, errors=2)"
+  "tail": "FAILED (failures=2, errors=2)"
  },
  {
   "mutant": "D2: <synthetic> 줄을 모형 호출로",
@@ -182,16 +182,26 @@
  {
   "mutant": "T10: tool_progress 를 다시 하위 에이전트로 거름",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T10: 하위 에이전트 도구의 진행도 남김",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T11: API 오류로 끝난 차례를 안 닫음",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)",
+  "red": true,
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "L0 가 위층을 import",
   "red": true,
-  "tail": "FAILED (failures=2)"
+  "tail": "FAILED (failures=4)"
  }
 ]

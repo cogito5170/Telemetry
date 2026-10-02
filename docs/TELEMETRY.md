@@ -75,7 +75,7 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 | `provider.rate_limit` | **계정**의 요금 한도(BD-32) -- 사용률 · 상태 문자열 · 문턱 · 한도 종류(five_hour …) · 초과 사용 상태 · 대체 경로. **사건마다** 따로 | cc_stream(`rate_limit_event`) · cc_jsonl(429 줄의 `quotaLimits`) | provider |
 | `input.received` | 런타임이 입력을 받아 줄에 세움(글은 길이만) | cc_jsonl(`queue-operation enqueue`) | liveness |
 | `turn.start` | 입력이 대화에 들어가 차례가 열림 -- 런타임이 매긴 차례 · 프롬프트 번호, 차례 출처 이름(human · task_notification …) | cc_jsonl(사람 · 알림 입력 줄. isMeta · 하위 에이전트 줄 제외) · cc_stream(`system/init`) | liveness |
-| `turn.end` | 런타임이 차례 끝을 선언함(`marker`: stop_hook_summary · result) | cc_jsonl(Stop 훅 요약, 막히지 않았을 때) · cc_stream(`result`) | liveness |
+| `turn.end` | 런타임이 차례 끝을 선언함(`marker`: stop_hook_summary · result · api_error, API 오류면 `error_type`) | cc_jsonl(Stop 훅 요약, 막히지 않았을 때 · 런타임이 끼운 API 오류 줄 -- Claude Code `StopFailure` 계약: "When the turn ends due to an API error") · cc_stream(`result`) | liveness |
 | `turn.continued` | Stop 훅이 끝을 막아 차례가 이어짐 | cc_jsonl(`preventedContinuation: true`) | liveness |
 | `source.closed` | 원천의 흐름이 닫힘(종료 코드) -- **수집기가 닫힘을 적었을 때만**. 파일 끝은 닫힘이 아니다 | cc_stream(캡처의 `{"_t", "closed": true, "returncode"}` 줄) | liveness |
 | `heartbeat` | 런타임이 '진행 중' 이라고 보낸 신호(emitter 마다 번호 · 원천의 박동 표시 · 원천이 보고한 경과) | Recorder · cc_stream(`tool_progress`) | liveness |
