@@ -88,13 +88,14 @@ class LlmCall(unittest.TestCase):
         with r.llm_call(0, "claude", "m", prompt_chars=900) as c:
             clk.t += 1840
             c.response(usage={"input_tokens": 1200, "cached_input_tokens": 200, "output_tokens": 430},
-                       usage_format="otel", stop_reason="stop", model="m")
+                       usage_format="otel", finish_reason="stop", model="m")
         req, resp = s.events
         self.assertEqual((req["type"], req["data"]["prompt_chars"]), ("llm.request", 900))
         d = resp["data"]
         self.assertEqual((d["total_input_tokens"], d["cache_read_input_tokens"], d["output_tokens"], d["elapsed_ms"]),
                          (1200, 200, 430, 1840))
         self.assertIn("input_tokens", resp["unobserved"])
+        self.assertEqual(d["stop_reason"], "stop")                    # OTel 이름으로 받아 같은 칸에
         self.assertEqual(otel_usage(d)["gen_ai.usage.input_tokens"], 1200)
         self.assertEqual([check(e) for e in s.events], [[], []])
 

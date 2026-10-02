@@ -56,8 +56,13 @@ class Recorder:
         return self.emit("llm.request", call_index=call_index, provider=provider, model=model, attempt=attempt,
                          prompt_chars=prompt_chars)
 
-    def llm_response(self, call_index: int, provider: str, usage=None, usage_format: "str | None" = None, **kw):
-        """usage_format: usage 의 꼴(anthropic · openai · gemini · otel). 없으면 provider 이름을 꼴로 쓴다."""
+    def llm_response(self, call_index: int, provider: str, usage=None, usage_format: "str | None" = None,
+                     finish_reason=None, **kw):
+        """usage_format: usage 의 꼴(anthropic · openai · gemini · otel). 없으면 provider 이름을 꼴로 쓴다.
+        finish_reason: OTel 이름(gen_ai.response.finish_reasons)으로 받는 입구 -- stop_reason 칸에 그대로 적힌다.
+        provider 고유 이름을 쓰지 않는 런타임(MS)을 위한 것이다."""
+        if finish_reason is not None:
+            kw["stop_reason"] = finish_reason
         vals, nulls = l0_usage(usage_format or provider, usage or {})
         return self.emit("llm.response", nulls, call_index=call_index, provider=provider, **vals, **kw)
 
