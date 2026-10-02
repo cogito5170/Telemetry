@@ -132,5 +132,41 @@
   "telemetry": "564785d",
   "sensor": "38892cd",
   "reported_by": "baseline"
+ },
+ {
+  "source": "cc_stream",
+  "recording": "a076db0f7428d116",
+  "content": "c45f34117760fcbf",
+  "native": 2,
+  "l0": 2,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "4232aa3",
+  "sensor": "2806943"
+ },
+ {
+  "source": "cc_stream",
+  "recording": "94bd45e1de9affd6",
+  "content": "9ff247b5c4f69ee7",
+  "native": 4,
+  "l0": 4,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "4232aa3",
+  "sensor": "2806943"
+ },
+ {
+  "source": "cc_stream",
+  "recording": "813498b2eeefa0a1",
+  "content": "483de58b4fd58594",
+  "native": 4,
+  "l0": 4,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "4232aa3",
+  "sensor": "2806943"
  }
 ]
