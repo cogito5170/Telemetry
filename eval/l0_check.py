@@ -3,6 +3,8 @@
     python3 eval/l0_check.py cc_jsonl <세션>.jsonl ...
     python3 eval/l0_check.py sweagent <dir>/*.traj.gz
     python3 eval/l0_check.py --summary
+    python3 eval/l0_check.py --reported <source> <보고한 세션> <내용 해시> <native> <l0> <same> <telemetry> <sensor>
+        다른 세션이 자기 기록으로 돌린 결과를 옮겨 적는다(그 세션의 기록은 이 컨테이너에 없다). reported_by 가 붙는다.
 
 옆에 ../Sensor 가 있어야 한다(llmsensor.telemetry.l0.compare 를 쓴다). 장부(eval/results/l0_check_corpus.json)에는
 **내용을 남기지 않는다**: 기록 식별자의 해시 · 파일 내용 해시 · 레코드 수 · 같은가 · 다르면 다른 칸 이름뿐.
@@ -78,6 +80,18 @@ def summary(rows) -> dict:
 
 
 def main(argv) -> int:
+    if argv[:1] == ["--reported"]:
+        source, by, ch, native, l0, same, tel, sen = argv[1:9]
+        rows = load()
+        if any(r["source"] == source and r["content"] == ch for r in rows):
+            print("이미 있다")
+            return 0
+        rows.append({"source": source, "recording": _h(f"reported:{by}"), "content": ch, "native": int(native),
+                     "l0": int(l0), "same": same == "true", "diff_fields": [], "checked": datetime.date.today().isoformat(),
+                     "telemetry": tel, "sensor": sen, "reported_by": by})
+        LEDGER.write_text(json.dumps(rows, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(json.dumps(summary(rows), ensure_ascii=False))
+        return 0
     if argv[:1] == ["--summary"]:
         print(json.dumps(summary(load()), ensure_ascii=False, indent=1))
         return 0

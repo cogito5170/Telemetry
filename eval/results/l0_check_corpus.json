@@ -106,5 +106,18 @@
   "checked": "2026-10-02",
   "telemetry": "e81b49a",
   "sensor": "2806943"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "a9a9395039a835f0",
+  "content": "afd590b6eb4b1ee8",
+  "native": 255,
+  "l0": 255,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "780867b",
+  "sensor": "92cc46b",
+  "reported_by": "baseline"
  }
 ]
