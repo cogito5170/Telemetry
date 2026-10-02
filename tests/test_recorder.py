@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from telemetry import MemorySink, Recorder
@@ -202,6 +203,27 @@ class ClosedLoop(unittest.TestCase):
                 with r.action("RETURN", action_ref=bad):
                     pass
         self.assertEqual(s.events, [])
+
+    def test_args_sig_same_for_same_call_and_never_plain(self):
+        """CMD-T17: 같은 (action_type, args) 이면 같은 args_sig -- 되풀이를 위층이 잡을 수 있게. 평문은 안 남는다."""
+        r, s, _ = rec()
+        calls = [("THROTTLE", {"node": "srv07", "pct": 50}), ("THROTTLE", {"pct": 50, "node": "srv07"}),
+                 ("THROTTLE", {"node": "srv07", "pct": 60}), ("DRAIN", {"node": "srv07", "pct": 50}), ("THROTTLE", {})]
+        for at, args in calls:
+            with r.action(at, args=args):
+                pass
+        sigs = [e["data"]["args_sig"] for e in s.events if e["type"] == "action.dispatch"]
+        self.assertEqual(sigs[0], sigs[1])                             # 열쇠 순서는 서명을 바꾸지 않는다
+        self.assertEqual(len({sigs[0], sigs[2], sigs[3], sigs[4]}), 4)  # 인자 · 행동 이름이 다르면 다르다 · {} 도 서명이 난다
+        self.assertEqual([check(e) for e in s.events], [[]] * len(s.events))
+        self.assertNotIn("srv07", json.dumps(s.events, ensure_ascii=False))
+
+    def test_args_sig_unobserved_without_args(self):
+        r, s, _ = rec()
+        with r.action("RETURN"):
+            pass
+        self.assertIsNone(s.events[0]["data"]["args_sig"])
+        self.assertIn("args_sig", s.events[0]["unobserved"])
 
     def test_heartbeat_counts_per_emitter(self):
         r, s, _ = rec()

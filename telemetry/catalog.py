@@ -176,6 +176,7 @@ EVENTS: "dict[str, dict[str, F]]" = {
     "action.dispatch": {
         "action_ref": _f("str", X), "decision_ref": _f("str", X, "어느 결정에서 나왔나 -- id 만. 결정의 내용 · 까닭은 L0 에 없다"),
         "action_type": _f("str", R, "실행기가 **실제로 실행한** 행동의 이름"), "target": _f("str", M, "#해시"),
+        "args_sig": _f("str", M, "행동 이름 + 인자 정규형의 열쇠 해시(tool_sig 와 같은 방식, 평문 없음). 인자를 안 주면 못 봄"),
     },
     "action.result": {
         "action_ref": _f("str", X), "is_error": _f("bool", R), "exit_code": _f("int", R), "status_code": _f("int", R),
