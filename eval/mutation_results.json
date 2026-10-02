@@ -102,7 +102,7 @@
  {
   "mutant": "isMeta 줄을 입력으로",
   "red": true,
-  "tail": "FAILED (failures=2, errors=1)"
+  "tail": "FAILED (failures=3, errors=1)"
  },
  {
   "mutant": "닫힘 표시 없이 파일 끝을 닫힘으로",
@@ -117,7 +117,7 @@
  {
   "mutant": "원천 순서를 버림(옛 순서)",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=4)"
  },
  {
   "mutant": "번호가 없는 차례에 번호를 세어 메움",
@@ -137,7 +137,7 @@
  {
   "mutant": "D2: 429 줄을 모형 호출로",
   "red": true,
-  "tail": "FAILED (failures=2, errors=3)"
+  "tail": "FAILED (failures=3, errors=3)"
  },
  {
   "mutant": "D2: <synthetic> 줄을 모형 호출로",
@@ -182,46 +182,56 @@
  {
   "mutant": "T10: tool_progress 를 다시 하위 에이전트로 거름",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=1)"
  },
  {
   "mutant": "T12: tool_use_id 만 봄(T10 의 결함 -- 실기록 0/8)",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=1)"
  },
  {
   "mutant": "T12: 도구 이름을 안 맞춤(하위 에이전트 진행이 Task 호출 id 로 새어 들어옴)",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=1)"
  },
  {
   "mutant": "T11: API 오류로 끝난 차례를 안 닫음",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=2)"
  },
  {
   "mutant": "T11: 오류가 아닌 <synthetic> 줄에서도 차례를 닫음(짐작)",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=1)"
  },
  {
   "mutant": "T14: 초를 그대로 ms 로 적음",
   "red": true,
-  "tail": "FAILED (failures=4)"
+  "tail": "FAILED (failures=2)"
  },
  {
   "mutant": "T14: resetsAt 을 안 읽음(못 봄으로 잘못 적음)",
   "red": true,
-  "tail": "FAILED (failures=5)"
+  "tail": "FAILED (failures=3)"
  },
  {
   "mutant": "T14: stream 의 한도 종류를 안 읽음",
   "red": true,
-  "tail": "FAILED (failures=2, errors=1)"
+  "tail": "FAILED (errors=1)"
+ },
+ {
+  "mutant": "T13: isMeta 경계를 버림(재개 차례가 사라짐)",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "T13: 경계 선언 없는 isMeta 줄도 차례를 엶",
+  "red": true,
+  "tail": "FAILED (failures=3, errors=1)"
  },
  {
   "mutant": "L0 가 위층을 import",
   "red": true,
-  "tail": "FAILED (failures=4)"
+  "tail": "FAILED (failures=2)"
  }
 ]

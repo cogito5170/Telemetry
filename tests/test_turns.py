@@ -93,6 +93,43 @@ class CCJsonlTurns(unittest.TestCase):
         self.assertNotIn("source.closed", _types(self.evs))
 
 
+class ResumeBoundary(unittest.TestCase):
+    """CMD-T13: 재개 뒤 첫 user 줄은 isMeta + turnPosition(turnOrigin "system") 이다(Sensor 세션 실기록 탐침, 02:13).
+    런타임이 선언한 차례 경계라 turn.start 를 낸다. 입력은 아니다 -- input.received 는 enqueue 둘 그대로."""
+
+    ROWS = [
+        {"type": "assistant", "timestamp": ts(1), "isApiErrorMessage": True, "apiErrorStatus": 429, "error": "rate_limit",
+         "message": {"id": "e1", "model": "<synthetic>", "content": []}},
+        {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(40)},
+        {"type": "queue-operation", "operation": "enqueue", "timestamp": ts(41), "content": "다시 해"},
+        {"type": "queue-operation", "operation": "dequeue", "timestamp": ts(42)},
+        {"type": "user", "isMeta": True, "timestamp": ts(43), "turnOrigin": "system",
+         "turnPosition": {"promptIndex": 7, "turnIndex": 9},
+         "message": {"role": "user", "content": [{"type": "text", "text": "비밀 재개 글"}]}},
+        {"type": "attachment", "timestamp": ts(44), "attachment": {}},
+        {"type": "assistant", "timestamp": ts(45), "message": {"id": "m9", "model": "claude-x", "usage": {"output_tokens": 1},
+                                                              "content": [{"type": "thinking"}]}},
+        # 경계 선언이 없는 isMeta 줄(로컬 명령 안내 등)은 여전히 아무것도 아니다
+        {"type": "user", "isMeta": True, "timestamp": ts(46), "message": {"role": "user", "content": "<caveat>"}},
+    ]
+
+    def test_meta_line_with_declared_position_opens_turn_but_is_not_input(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "s.jsonl")
+            with open(p, "w", encoding="utf-8") as f:
+                for x in self.ROWS:
+                    f.write(json.dumps(x, ensure_ascii=False) + "\n")
+            evs = from_cc_jsonl(p, "x")
+        self.assertEqual([check(e) for e in evs], [[]] * len(evs))
+        self.assertEqual([e["type"] for e in evs if e["type"] in TURN_EVENTS],
+                         ["turn.end", "input.received", "input.received", "turn.start"])
+        st = [e for e in evs if e["type"] == "turn.start"][0]
+        self.assertEqual((st["data"]["turn_origin"], st["data"]["turn_index"], st["data"]["prompt_index"]), ("system", 9, 7))
+        resp = [e for e in evs if e["type"] == "llm.response"][0]
+        self.assertLess(st["seq"], resp["seq"])                       # 경계가 응답 앞에
+        self.assertNotIn("비밀", json.dumps(evs, ensure_ascii=False))
+
+
 class CCStreamTurns(unittest.TestCase):
     def _run(self, rows):
         with tempfile.TemporaryDirectory() as d:

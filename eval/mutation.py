@@ -116,6 +116,11 @@ MUTANTS = [
      '    if "resetsAt" not in src:\n        return {}, []', '    if True:\n        return {}, []'),
     ("T14: stream 의 한도 종류를 안 읽음", "telemetry/collect/__init__.py",
      '            ov, on = _take(info, {"limit_type": "rateLimitType",', '            ov, on = _take(info, {"limit_type_x": "rateLimitType",'),
+    ("T13: isMeta 경계를 버림(재개 차례가 사라짐)", "telemetry/collect/__init__.py",
+     '            if is_input or declared_boundary:', '            if is_input:'),
+    ("T13: 경계 선언 없는 isMeta 줄도 차례를 엶", "telemetry/collect/__init__.py",
+     '            declared_boundary = (d.get("type") == "user" and d.get("isMeta") is True\n                                 and isinstance(d.get("turnPosition"), dict))',
+     '            declared_boundary = d.get("type") == "user" and d.get("isMeta") is True'),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]

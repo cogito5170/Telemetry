@@ -271,8 +271,13 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
             is_input = d.get("type") == "user" and not d.get("isMeta") and (
                 isinstance(content, str) or (isinstance(content, list) and content and not any(
                     isinstance(b, dict) and b.get("type") == "tool_result" for b in content)))
-            if is_input:
-                # 입력이 대화에 들어갔다 -- 차례가 열린다. 글은 길이만
+            # CMD-T13: 런타임이 turnPosition 으로 차례 경계를 **선언**한 줄은 isMeta 여도 차례가 열린다(재개 뒤 첫 줄 --
+            # isMeta + turnPosition, turnOrigin "system", Sensor 세션 실기록 탐침). isMeta 줄은 여전히 **입력이 아니다**
+            # (input.received 는 queue-operation 에서만 나고, 이 갈래는 차례 경계만 낸다).
+            declared_boundary = (d.get("type") == "user" and d.get("isMeta") is True
+                                 and isinstance(d.get("turnPosition"), dict))
+            if is_input or declared_boundary:
+                # 입력이 대화에 들어갔다(또는 런타임이 경계를 선언했다) -- 차례가 열린다. 글은 길이만
                 pos = d.get("turnPosition") if isinstance(d.get("turnPosition"), dict) else {}
                 v, nl = _take(pos, {"turn_index": "turnIndex", "prompt_index": "promptIndex"})
                 origin = d.get("turnOrigin") or ((d.get("origin") or {}).get("kind") if isinstance(d.get("origin"), dict)
