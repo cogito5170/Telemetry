@@ -165,7 +165,10 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 
 - **차례 경계(CMD-T2) 실데이터**: 이 세션 JSONL 에서 `input.received` 7 · `turn.start` 6 · `turn.end` 5(여섯째 차례는 수집 시점에 열려 있었고,
   일곱째 입력은 차례 중에 줄에 선 알림이다). JSONL 의 `turn.end` 는 **Stop 훅이 있어야** 나온다(그 요약 줄뿐이다) -- 훅이 없는 세션에서는 차례 끝을 못 본다.
-  cc_stream 실데이터는 없다(합성만). `source.closed` 는 캡처가 닫힘 줄을 적어야 나온다 -- Sensor `eval/run_claude.py`(Sensor 소유)가 아직 안 적는다.
+  `source.closed` 는 캡처가 닫힘 줄을 적어야 나온다(이 저장소 `eval/capture_stream.py` 가 적는다).
+  cc_stream 실데이터(CMD-T8, 사용자 허락 · `claude -p` 세 번, haiku, 보고 비용 합 $0.0889): 세 기록 모두 `turn.start` 1 · `turn.end` 1 ·
+  `run.end` 1 · `source.closed` 1, `l0-check` 같음(2/2 · 4/4 · 4/4). 캡처 글은 커밋하지 않았다. 같은 실행의 자식 JSONL 셋도 같음 --
+  그러나 Stop 훅이 없어 `turn.end` 가 없다(위 한계 그대로).
 
 - 시험 33 개 통과. **변이 17 가지 모두 빨강**(`python3 eval/mutation.py`, 결과 `eval/mutation_results.json`) -- 해석 칸 넣기 · 우리 문턱 넣기 ·
   경과 시간으로 시간 초과 판정 · 결과 없음을 성공으로 · 예외 메시지 남김 · 오지 않은 결과 지어내기 · 보고된 null 을 못 봄으로 · 경로 평문 ·
