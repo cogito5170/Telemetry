@@ -136,7 +136,7 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 | 1 | Sensor → Telemetry 의존 | **선택 의존**. 실데이터에서 `l0-check` 가 계속 같으면 필수로 | 됨 -- 이 세션 JSONL 124/124 레코드 같음 |
 | 2 | Sensor `derive.py` 의 문턱 있는 파생 | **sensing/token 으로 옮김** | 됨 -- 정의 불변 |
 | 3 | MS `RunRecord.policy` | **결정 기록으로 떼고 `decision_ref` 로 잇기** | 됨 |
-| 4 | MS 가 Recorder 로 L0 를 직접 내기 | 계획 ②(Sensor 배선)와 같이 | 남음 |
+| 4 | MS 가 Recorder 로 L0 를 직접 내기 | 붙임(선택 의존) -- `ms/l0.py` · `Runtime(l0_ledger=…)` · `ms ask --l0-ledger` | 됨 -- 모형 호출 · 도구 호출 · 실행 시작/끝(+`decision_ref`). `action.*` 은 Action Executor 가 서면 |
 | 5 | 새 L1 팩: liveness · recovery · dependency · action_outcome | L0 사건은 준비됨. 문턱은 운영자 설정만 | 남음 |
 | 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 1 의 대조가 실데이터에서 쌓인 뒤 | 남음 |
 
@@ -148,7 +148,7 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 - **실데이터 한 번**: 이 작업을 한 Claude Code 세션 자신의 JSONL(모형 호출 27 · 도구 35)에서 Sensor 수집기 출력과 `compat` 출력이
   **62/62 레코드 같았다.** 그 파일은 커밋하지 않았다(사적 글). cost-state 줄은 그 파일에 없었다 -- run.snapshot 은 합성 자료로만 시험했다.
   도구 35 개 중 끝 사건은 34 개 -- 수집 시점에 돌던 도구 하나가 '시작만 있음' 으로 남았다(규칙 7 그대로).
-- **Recorder 는 아직 아무 런타임에도 안 붙었다.** 시험만 있다.
+- Recorder 는 MS 런타임에 붙었다(모의 provider · 시험으로만 돌려 봤다. 진짜 API 로는 아직).
 - OpenAI · Gemini usage 대응은 SDK 소스로만 확인했다(확인수준 D, Sensor 와 같음). OpenAI 오류는 429 만 번역한다.
 - `compat` 이 Sensor 와 다를 수 있는 경우 하나: 한 stream 에 `autocompact_state` 가 둘 이상이고 마지막 것에 threshold 가 없으면,
   Sensor 는 None 으로 덮고 `compat` 은 앞의 값을 쓴다. 실데이터에서 본 적은 없다.
