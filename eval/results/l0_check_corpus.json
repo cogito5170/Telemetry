@@ -94,5 +94,17 @@
   "checked": "2026-10-02",
   "telemetry": "e246ada",
   "sensor": "de659f5"
+ },
+ {
+  "source": "cc_jsonl",
+  "recording": "5089897872e1e766",
+  "content": "ba4cd40b0eefe714",
+  "native": 399,
+  "l0": 399,
+  "same": true,
+  "diff_fields": [],
+  "checked": "2026-10-02",
+  "telemetry": "e81b49a",
+  "sensor": "2806943"
  }
 ]

@@ -159,6 +159,9 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
   - D3: D2 의 결과로 단가표에 없는 '모델' 이 세션 비용을 None 으로 만들지 않는다.
   - D4: `compact_boundary` -> `runtime.compaction`.
   - 합성 세션에서 Sensor State 가 `rate_limit_state = LIMITED` · `runtime_reliability = FAILURE_OBSERVED` 로 읽는다(전에는 UNKNOWN · NO_FAILURE_OBSERVED).
+  - **실데이터(이 세션 JSONL)**: 도구 시간 한도를 넘긴 실제 명령 하나(Bash 도구 timeout 5 s, 일부러) -> 런타임이 죽이지 않고 백그라운드로 옮겼다.
+    L0 `tool.end`: `timed_out=True` · `declared_timeout_ms=5000` · `moved_to_background=True` · `is_error=False`(옛 글 규칙이면 거짓 음성).
+    같은 기록에 `input.removed`(absorbed_mid_turn) 1. 429 · 압축은 이 세션에 없었다 -- 합성 자료로만 시험했다.
 
 - **차례 경계(CMD-T2) 실데이터**: 이 세션 JSONL 에서 `input.received` 7 · `turn.start` 6 · `turn.end` 5(여섯째 차례는 수집 시점에 열려 있었고,
   일곱째 입력은 차례 중에 줄에 선 알림이다). JSONL 의 `turn.end` 는 **Stop 훅이 있어야** 나온다(그 요약 줄뿐이다) -- 훅이 없는 세션에서는 차례 끝을 못 본다.
