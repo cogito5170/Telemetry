@@ -18,8 +18,17 @@ from __future__ import annotations
 
 
 def l0_usage(provider: str, u: dict) -> "tuple[dict, list]":
-    """-> (칸 dict, 원천이 null 로 준 칸들)."""
+    """-> (칸 dict, 원천이 null 로 준 칸들). provider 는 usage 의 **꼴** 이름이다(anthropic · openai · gemini · otel)."""
     u = u or {}
+    if provider == "otel":
+        # 이미 정규화된 OTel 식(MS canonical Usage): input = 캐시 포함 전체, cached_input = 캐시 읽기, output = 생각 포함.
+        # 캐시 쓰기가 따로 없어 '캐시 밖 입력' 을 셈할 수 없다 -- input_tokens 는 못 봄으로 두고 전체를 total_input_tokens 에
+        out = {}
+        for src, dst in (("input_tokens", "total_input_tokens"), ("cached_input_tokens", "cache_read_input_tokens"),
+                         ("output_tokens", "output_tokens")):
+            if u.get(src) is not None:
+                out[dst] = u[src]
+        return out, []
     if provider in ("anthropic", "claude"):
         out, nulls = {}, []
         for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"):
@@ -80,6 +89,8 @@ def otel_usage(data: dict) -> dict:
     out = {}
     if None not in (i, r, w):
         out["gen_ai.usage.input_tokens"] = i + r + w        # OTel: "SHOULD include ... cached tokens"
+    elif data.get("total_input_tokens") is not None:
+        out["gen_ai.usage.input_tokens"] = data["total_input_tokens"]
     if r is not None:
         out["gen_ai.usage.cache_read.input_tokens"] = r
     if w is not None:

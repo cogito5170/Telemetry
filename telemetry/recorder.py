@@ -56,16 +56,39 @@ class Recorder:
         return self.emit("llm.request", call_index=call_index, provider=provider, model=model, attempt=attempt,
                          prompt_chars=prompt_chars)
 
-    def llm_response(self, call_index: int, provider: str, usage=None, **kw):
-        vals, nulls = l0_usage(provider, usage or {})
+    def llm_response(self, call_index: int, provider: str, usage=None, usage_format: "str | None" = None, **kw):
+        """usage_format: usage 의 꼴(anthropic · openai · gemini · otel). 없으면 provider 이름을 꼴로 쓴다."""
+        vals, nulls = l0_usage(usage_format or provider, usage or {})
         return self.emit("llm.response", nulls, call_index=call_index, provider=provider, **vals, **kw)
 
     def llm_error(self, call_index: int, provider: str, http_status=None, body=None, headers=None, attempt: int = 0,
-                  elapsed_ms=None):
-        t = translate(provider, http_status, body, headers)
+                  elapsed_ms=None, exception=None, table: "str | None" = None):
+        """table: 오류 대응표 이름(anthropic · openai · gemini). 없으면 provider. 상태 · 본문이 없으면 번역하지 않는다(못 봄)."""
+        t = translate(table or provider, http_status, body, headers)
+        nothing = http_status is None and not body
         return self.emit("llm.error", call_index=call_index, attempt=attempt, provider=provider,
-                         http_status=t.http_status, provider_code=t.provider_code, error_code=t.error_code.value,
-                         error_code_source=t.source, retry_after_ms=t.retry_after_ms, elapsed_ms=elapsed_ms)
+                         http_status=t.http_status, provider_code=t.provider_code,
+                         error_code=None if nothing else t.error_code.value,
+                         error_code_source=None if nothing else t.source, retry_after_ms=t.retry_after_ms,
+                         exception=exception, elapsed_ms=elapsed_ms)
+
+    @contextmanager
+    def llm_call(self, call_index: int, provider: str, model=None, attempt: int = 0, prompt_chars=None,
+                 table: "str | None" = None):
+        """llm.request 를 내고, 블록 안에서 `c.response(...)` 를 부르면 llm.response, 예외가 나면 llm.error(예외 종류 ·
+        예외에 status · body 가 붙어 있으면 그것)를 낸다. 경과 시간은 단조 시계로 잰다. 예외는 다시 던진다."""
+        self.llm_request(call_index, provider, model, attempt, prompt_chars)
+        h = _Call()
+        t0 = self.mono()
+        try:
+            yield h
+        except BaseException as e:
+            self.llm_error(call_index, provider, getattr(e, "status", None), getattr(e, "body", None),
+                           getattr(e, "headers", None), attempt, self.mono() - t0, type(e).__name__, table)
+            raise
+        else:
+            if h.kw is not None:
+                self.llm_response(call_index, provider, elapsed_ms=self.mono() - t0, **h.kw)
 
     # ── 도구 ──
     @contextmanager
@@ -112,6 +135,14 @@ class Recorder:
             raise
         finally:
             self.emit("action.result", action_ref=ref, elapsed_ms=self.mono() - t0, **h.vals)
+
+
+class _Call:
+    def __init__(self):
+        self.kw = None
+
+    def response(self, **kw):
+        self.kw = kw
 
 
 class _Outcome:

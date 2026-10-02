@@ -64,10 +64,10 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 | 사건 | 무엇 | 지금 내는 곳 | L1 에서 읽을 팩 |
 |---|---|---|---|
 | `llm.request` | 모형에 보냄(몇 번째 시도인가) | Recorder | execution · recovery |
-| `llm.response` | 응답 하나 -- 토큰(캐시 밖 · 읽기 · 쓰기 5m/1h · 출력 · 생각) · 끝난 까닭 · HTTP 상태 · 시각 · 경과 | 세 수집기 · Recorder | token · latency · cost · provider |
-| `llm.error` | 공급자 오류 -- HTTP 상태 · 공급자 코드(원래 값) · 정준 코드(번역) · 선언된 대기 | Recorder | provider · recovery |
+| `llm.response` | 응답 하나 -- 토큰(캐시 밖 · 읽기 · 쓰기 5m/1h · 출력 · 생각. 원천이 갈라 주지 않으면 `total_input_tokens` 만) · 끝난 까닭 · HTTP 상태 · 시각 · 경과 | 세 수집기 · Recorder(MS 런타임) | token · latency · cost · provider |
+| `llm.error` | 공급자 오류 -- HTTP 상태 · 공급자 코드(원래 값) · 정준 코드(번역, 볼 것이 없으면 못 봄) · 선언된 대기 · 예외 종류 | Recorder(MS 런타임) | provider · recovery |
 | `tool.start` · `tool.end` | 도구 호출과 결과 -- 오류 깃발 · 중단 · 선언된 시간 초과 · 종료 코드 · 예외 종류 · 출력 길이 · 경과 | 세 수집기 · Recorder | execution · latency · liveness |
-| `run.start` · `run.end` | 실행 시작 · 끝 요약(런타임이 준 값만. 합계를 우리가 내지 않는다) | cc_stream · sweagent · Recorder | execution · cost |
+| `run.start` · `run.end` | 실행 시작 · 끝 요약(런타임이 준 값만. 합계를 우리가 내지 않는다). `run.end.decision_ref` = 그 실행을 낳은 결정 기록 id | cc_stream · sweagent · Recorder(MS 런타임) | execution · cost |
 | `run.snapshot` | 실행 도중의 누적 스냅숏(Claude Code cost-state -- 끝이 아니다) | cc_jsonl | cost |
 | `runtime.limits` | 런타임이 선언한 맥락 창 · 최대 출력 · 자동 압축 문턱 | cc_stream | token |
 | `provider.rate_limit` | 사용률 · 런타임 상태 문자열 · 런타임 문턱 -- **사건마다** 따로(마지막 값으로 덮지 않는다) | cc_stream | provider |

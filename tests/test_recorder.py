@@ -81,6 +81,59 @@ class Llm(unittest.TestCase):
         self.assertEqual(s.events[-1]["data"]["error_code"], "UNKNOWN")      # 표에 없으면 추측하지 않는다
 
 
+class LlmCall(unittest.TestCase):
+    def test_success_measures_elapsed_and_keeps_otel_usage_unsplit(self):
+        """정규화된 OTel 꼴(MS canonical): 전체 입력만 있다 -- 캐시 밖 입력을 지어내지 않는다."""
+        r, s, clk = rec()
+        with r.llm_call(0, "claude", "m", prompt_chars=900) as c:
+            clk.t += 1840
+            c.response(usage={"input_tokens": 1200, "cached_input_tokens": 200, "output_tokens": 430},
+                       usage_format="otel", stop_reason="stop", model="m")
+        req, resp = s.events
+        self.assertEqual((req["type"], req["data"]["prompt_chars"]), ("llm.request", 900))
+        d = resp["data"]
+        self.assertEqual((d["total_input_tokens"], d["cache_read_input_tokens"], d["output_tokens"], d["elapsed_ms"]),
+                         (1200, 200, 430, 1840))
+        self.assertIn("input_tokens", resp["unobserved"])
+        self.assertEqual(otel_usage(d)["gen_ai.usage.input_tokens"], 1200)
+        self.assertEqual([check(e) for e in s.events], [[], []])
+
+    def test_error_keeps_status_and_type_not_message(self):
+        class ProviderError(RuntimeError):
+            def __init__(self, msg, status=None, body=None):
+                super().__init__(msg)
+                self.status, self.body = status, body
+        r, s, clk = rec()
+        with self.assertRaises(ProviderError):
+            with r.llm_call(1, "claude", table="anthropic"):
+                clk.t += 30
+                raise ProviderError("HTTP 429: secret body", 429, {"error": {"type": "rate_limit_error"}})
+        d = s.events[-1]["data"]
+        self.assertEqual((d["exception"], d["http_status"], d["provider_code"], d["error_code"], d["elapsed_ms"]),
+                         ("ProviderError", 429, "rate_limit_error", "RATE_LIMITED", 30))
+        self.assertNotIn("secret", str(s.events))
+
+    def test_error_without_status_is_not_translated(self):
+        r, s, _ = rec()
+        with self.assertRaises(ConnectionError):
+            with r.llm_call(0, "sim"):
+                raise ConnectionError("down")
+        e = s.events[-1]
+        self.assertEqual(e["data"]["exception"], "ConnectionError")
+        self.assertIn("error_code", e["unobserved"])                 # 볼 것이 없었다 -- UNKNOWN 이라고 번역하지 않는다
+
+    def test_no_response_given_emits_only_request(self):
+        r, s, _ = rec()
+        with r.llm_call(0, "sim"):
+            pass
+        self.assertEqual([e["type"] for e in s.events], ["llm.request"])
+
+    def test_run_end_links_decision_by_id(self):
+        r, s, _ = rec()
+        r.run_end(decision_ref="dec-0123456789abcdef", terminal_reason="executed")
+        self.assertEqual(s.events[-1]["data"]["decision_ref"], "dec-0123456789abcdef")
+
+
 class ClosedLoop(unittest.TestCase):
     def test_action_result_returns_to_l0(self):
         """Action 의 결과는 다시 Telemetry 로. 결정의 **내용**은 없고 id 만 잇는다."""

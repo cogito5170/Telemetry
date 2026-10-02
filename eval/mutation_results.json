@@ -80,6 +80,21 @@
   "tail": "FAILED (failures=1)"
  },
  {
+  "mutant": "OTel 꼴에서 캐시 밖 입력을 지어냄",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "볼 것 없는 오류를 UNKNOWN 으로 번역",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "오류 메시지를 남김",
+  "red": true,
+  "tail": "FAILED (failures=2)"
+ },
+ {
   "mutant": "L0 가 위층을 import",
   "red": true,
   "tail": "FAILED (failures=2)"

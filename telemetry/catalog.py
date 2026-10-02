@@ -40,6 +40,8 @@ R, D, M, T, X = "reported", "declared", "measured", "translated", "ref"
 # 모형 사용량 -- Anthropic 식으로 셋을 갈라 둔다(가장 잘게 쪼갠 꼴. OTel 의 '캐시 포함 입력' 은 더해서 낸다)
 USAGE = {
     "input_tokens": _f("int", R, "캐시 **밖**에서 새로 읽은 입력"),
+    "total_input_tokens": _f("int", R, "캐시 읽기 · 쓰기를 **포함한** 전체 입력(OTel gen_ai.usage.input_tokens). "
+                                       "원천이 셋으로 갈라 주지 않을 때만 -- 갈라서 지어내지 않는다"),
     "cache_read_input_tokens": _f("int", R, "캐시에서 읽은 입력"),
     "cache_creation_input_tokens": _f("int", R, "캐시에 새로 쓴 입력"),
     "cache_creation_5m_input_tokens": _f("int", R), "cache_creation_1h_input_tokens": _f("int", R),
@@ -72,6 +74,7 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "error_code": _f("str", T, "정준 어휘(errors.ErrorCode). 대응표에 없으면 UNKNOWN"),
         "error_code_source": _f("str", X, "대응표의 출처"),
         "retry_after_ms": _f("num", D, "공급자가 선언한 대기"),
+        "exception": _f("str", R, "예외 종류 이름(메시지는 안 남긴다)"),
         "elapsed_ms": _f("num", M),
     },
     # ── 도구 ────────────────────────────────────────────────────────────────
@@ -91,6 +94,7 @@ EVENTS: "dict[str, dict[str, F]]" = {
     # ── 실행 ────────────────────────────────────────────────────────────────
     "run.start": {"model": _f("str", R), "provider": _f("str", R)},
     "run.end": {
+        "decision_ref": _f("str", X, "이 실행을 낳은 결정 기록의 id(MS DecisionRecord.id). 결정의 내용은 L0 에 없다"),
         "model": _f("str", R), "run_duration_ms": _f("num", R), "api_duration_ms": _f("num", R),
         "api_duration_without_retries_ms": _f("num", R), "ttft_ms": _f("num", R), "num_turns": _f("int", R),
         "cost_usd": _f("num", R, "**원천이 보고한** 비용. 단가표로 계산한 비용은 L0 가 아니다"),
