@@ -180,8 +180,18 @@
   "tail": "FAILED (failures=2)"
  },
  {
+  "mutant": "T10: tool_progress 를 다시 하위 에이전트로 거름",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "T10: 하위 에이전트 도구의 진행도 남김",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
   "mutant": "L0 가 위층을 import",
   "red": true,
-  "tail": "FAILED (failures=4)"
+  "tail": "FAILED (failures=2)"
  }
 ]

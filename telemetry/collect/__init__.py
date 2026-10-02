@@ -295,6 +295,17 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
     return L.events()
 
 
+def _main_progress(d, L) -> bool:
+    """CMD-T10: `tool_progress` 는 진행 중인 도구의 id 를 parent_tool_use_id 에 단다(Sensor 세션이 t11 원본에서 봄).
+    그래서 하위 에이전트 거르기에 같이 걸려 박동이 사라졌다. **주 에이전트가 부른 도구**의 진행이면 남긴다:
+    tool_use_id 가 있으면 그것이, 없으면 parent_tool_use_id 가 이 실행의 도구 장부에 있어야 한다.
+    하위 에이전트의 도구는 장부에 오르지 않으므로(그 assistant 줄을 거른다) 그 진행은 여전히 걸러진다."""
+    if d.get("type") != "tool_progress":
+        return False
+    ref = d.get("tool_use_id") or d.get("parent_tool_use_id")
+    return ref in L.tools
+
+
 def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[dict]":
     """줄마다 {"_t": 수집기 단조 ms, "line": 원래 줄}. stream_event 에는 런타임 시각이 없어 _t 를 쓴다."""
     L = _Ledger(run_id, "cc_stream", "monotonic_ms", hasher)
@@ -310,8 +321,8 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
             L.run_event("source.closed", t, {"exit_code": rc if isinstance(rc, int) else None})
             continue
         ty = d.get("type")
-        if d.get("parent_tool_use_id"):           # 하위 에이전트 사건은 뺀다
-            continue
+        if d.get("parent_tool_use_id") and not _main_progress(d, L):
+            continue                               # 하위 에이전트 사건은 뺀다
         if ty == "stream_event":
             ev = d.get("event") or {}
             et = ev.get("type")

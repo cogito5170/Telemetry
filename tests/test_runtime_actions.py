@@ -125,6 +125,41 @@ class StreamRuntimeActions(unittest.TestCase):
         self.assertIn("post_tokens", c["unobserved"])
 
 
+class ToolProgressHeartbeats(unittest.TestCase):
+    """CMD-T10: 주 에이전트 도구의 tool_progress 는 parent_tool_use_id 가 달려 있어도 heartbeat 다(t11 처럼 8 개).
+    하위 에이전트(Task) 안의 사건 · 그 도구의 진행은 여전히 거른다."""
+
+    ROWS = [{"_t": 0, "line": {"type": "system", "subtype": "init"}},
+            {"_t": 10, "line": {"type": "stream_event", "event": {"type": "message_start",
+                                                                  "message": {"id": "m1", "usage": {}}}}},
+            {"_t": 20, "line": {"type": "assistant", "message": {"id": "m1", "content": [
+                {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "sleep 150"}},
+                {"type": "tool_use", "id": "task1", "name": "Task", "input": {"prompt": "x"}}]}}}]
+    # t11 꼴: 3 · 30 · 33 · 60 · 63 · 90 · 93 · 120 초, 30 초마다 heartbeat 표시
+    ROWS += [{"_t": 20 + s * 1000, "line": {"type": "tool_progress", "tool_use_id": "t1", "parent_tool_use_id": "t1",
+                                           "elapsed_time_seconds": s, **({"heartbeat": True} if s % 30 == 0 else {})}}
+             for s in (3, 30, 33, 60, 63, 90, 93, 120)]
+    ROWS += [{"_t": 121000, "line": {"type": "tool_progress", "parent_tool_use_id": "t1", "elapsed_time_seconds": 121}},
+             # 하위 에이전트: 그 assistant 줄 · 그 도구의 진행 -- 거른다
+             {"_t": 122000, "line": {"type": "assistant", "parent_tool_use_id": "task1", "message": {
+                 "id": "sub1", "content": [{"type": "tool_use", "id": "st1", "name": "Bash", "input": {"command": "ls"}}]}}},
+             {"_t": 123000, "line": {"type": "tool_progress", "tool_use_id": "st1", "parent_tool_use_id": "task1",
+                                     "elapsed_time_seconds": 1}},
+             {"_t": 124000, "line": {"type": "result", "subtype": "success"}}]
+
+    def test_main_tool_progress_kept_subagent_filtered(self):
+        with tempfile.TemporaryDirectory() as d:
+            evs = from_cc_stream(_write(d, "t11.stream.jsonl", self.ROWS), "s", Hasher(KEY))
+        self.assertEqual([check(e) for e in evs], [[]] * len(evs))
+        hb = _of(evs, "heartbeat")
+        self.assertEqual(len(hb), 9)                    # t11 의 8 + tool_use_id 없이 parent 만 단 1
+        self.assertEqual(sum(1 for e in hb if e["data"]["heartbeat_flag"] is True), 4)
+        self.assertEqual([e["data"]["reported_elapsed_ms"] for e in hb][:8],
+                         [s * 1000 for s in (3, 30, 33, 60, 63, 90, 93, 120)])
+        self.assertEqual(len(_of(evs, "llm.response")), 1)         # 하위 에이전트의 모형 호출은 없다
+        self.assertEqual(len(_of(evs, "tool.start")), 2)           # 주 에이전트의 Bash · Task 만
+
+
 @unittest.skipUnless((SENSOR / "llmsensor").is_dir(), "옆에 ../Sensor 가 없다")
 class SensorSeesTheFixes(unittest.TestCase):
     @classmethod
