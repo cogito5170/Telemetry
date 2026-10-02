@@ -300,6 +300,16 @@
   "tail": "FAILED (failures=3)"
  },
  {
+  "mutant": "T18: tool_use_id 를 안 실음",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutant": "T18: 수집기가 지은 id 도 실음(anon<n> · sweagent s<n>)",
+  "red": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
   "mutant": "L0 가 위층을 import",
   "red": true,
   "tail": "FAILED (failures=4)"

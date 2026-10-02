@@ -82,6 +82,8 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "call_index": _f("int", X, "그 도구를 부른 모형 호출"), "tool_index": _f("int", X, "실행 안 도구 순번"),
         "tool_name": _f("str", R), "tool_head": _f("str", M, "이름:겨냥 -- 겨냥은 맨 프로그램 이름만 평문, 나머지는 #해시"),
         "tool_sig": _f("str", M, "이름 + 인자 정규형의 열쇠 해시"), "tool_input_chars": _f("int", M),
+        "tool_use_id": _f("str", X, "원천이 매긴 도구 호출 id 그대로(Claude Code tool_use.id) -- 훅 입력 · transcript 와 잇는 "
+                                    "열쇠(CMD-T18). 원천이 안 주면 못 봄 -- 수집기가 지은 id 는 싣지 않는다"),
     },
     "tool.end": {
         "tool_index": _f("int", X),

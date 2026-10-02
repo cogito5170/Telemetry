@@ -111,15 +111,18 @@ class _Ledger:
         c["t_start_ms"] = t if c["t_start_ms"] is None else min(c["t_start_ms"], t)
         c["t_end_ms"] = t if c["t_end_ms"] is None else max(c["t_end_ms"], t)
 
-    def tool_use(self, mid, block, t):
+    def tool_use(self, mid, block, t, source_id=True):
+        """source_id: block 의 id 를 원천이 매겼나. 아니면(sweagent 처럼 수집기가 지은 id) tool_use_id 는 못 봄."""
         c = self.call(mid)
         c["tools"] += 1
         tid = block.get("id") or f"anon{len(self.tool_order)}"
+        sid = block.get("id") if source_id else None
         inp = block.get("input") or {}
         name = block.get("name", "")
         self.tools[tid] = {"start": {"call_index": self.order.index(mid), "tool_name": name,
                                      "tool_head": tool_head(name, inp, self.h), "tool_sig": tool_sig(name, inp, self.h),
-                                     "tool_input_chars": len(json.dumps(inp, ensure_ascii=False))},
+                                     "tool_input_chars": len(json.dumps(inp, ensure_ascii=False)),
+                                     **({"tool_use_id": sid} if isinstance(sid, str) and sid else {})},
                            "t_issued": t, "end": None, "line_start": self.line}
         self.tool_order.append(tid)
 
@@ -489,7 +492,7 @@ def from_sweagent(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
         first = act.split()[0] if act.split() else ""
         # 첫 낱말이 경로(./run.sh · /tmp/x)일 수 있다 -- 맨 프로그램 이름만 평문
         name = first if not first or PROGRAM.match(first) else "#" + L.h(first)
-        L.tool_use(i, {"id": f"s{i}", "name": name, "input": {"command": act}}, None)
+        L.tool_use(i, {"id": f"s{i}", "name": name, "input": {"command": act}}, None, source_id=False)
         # 관측 글은 있지만 오류 깃발 · 시각은 없다 -- 있는 것(길이)만
         L.tools[f"s{i}"].update(end={"output_chars": len(s.get("observation") or "")}, t_result=None, nulls=[])
     info = d.get("info") or {}

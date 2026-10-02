@@ -154,6 +154,11 @@ MUTANTS = [
     ("T17: 열쇠 순서를 그대로(정규형 아님)", "telemetry/hashing.py",
      '    return h(name + json.dumps(inp or {}, ensure_ascii=False, sort_keys=True))',
      '    return h(name + json.dumps(inp or {}, ensure_ascii=False))'),
+    ("T18: tool_use_id 를 안 실음", "telemetry/collect/__init__.py",
+     '                                     **({"tool_use_id": sid} if isinstance(sid, str) and sid else {})},',
+     '                                     },'),
+    ("T18: 수집기가 지은 id 도 실음(anon<n> · sweagent s<n>)", "telemetry/collect/__init__.py",
+     '        sid = block.get("id") if source_id else None', '        sid = tid'),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]

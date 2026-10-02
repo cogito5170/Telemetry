@@ -72,6 +72,31 @@ class CCJsonl(unittest.TestCase):
         self.assertEqual(txt["data"]["thinking_duration_ms"], 40)
 
 
+    def test_tool_use_id_is_the_source_id(self):
+        """CMD-T18: tool.start.tool_use_id = 원천 tool_use.id 그대로 -- 훅 입력의 tool_use_id 와 잇는 열쇠."""
+        ids = []
+        with open(self.p, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    c = (json.loads(line).get("message") or {}).get("content")
+                except json.JSONDecodeError:                           # 시험 자료에 일부러 깨진 줄이 있다
+                    continue
+                if isinstance(c, list):
+                    ids += [b["id"] for b in c if isinstance(b, dict) and b.get("type") == "tool_use"]
+        self.assertEqual([e["data"]["tool_use_id"] for e in _of(self.evs, "tool.start")], ids)
+
+    def test_tool_use_without_id_is_unobserved_not_made_up(self):
+        rows = [{"type": "assistant", "timestamp": "2026-10-02T00:00:01Z", "message": {
+                    "id": "m1", "role": "assistant", "model": "claude-x", "usage": {"input_tokens": 1, "output_tokens": 1},
+                    "content": [{"type": "tool_use", "name": "Bash", "input": {"command": "ls"}}]}}]
+        p = os.path.join(self.d.name, "noid.jsonl")
+        with open(p, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(r) + "\n" for r in rows)
+        st = _of(from_cc_jsonl(p, "x", Hasher(KEY)), "tool.start")[0]
+        self.assertIsNone(st["data"]["tool_use_id"])                  # 수집기가 지은 anon<n> 을 싣지 않는다
+        self.assertIn("tool_use_id", st["unobserved"])
+
+
 class CCStream(unittest.TestCase):
     def test_stream(self):
         with tempfile.TemporaryDirectory() as d:
@@ -95,6 +120,7 @@ class CCStream(unittest.TestCase):
         self.assertIn("api_error_status", end["reported_null"])      # null 로 줬다 = 오류 보고 없음
         self.assertIn("ttft_ms", end["unobserved"])                   # 키가 없었다 = 못 봄
         self.assertEqual(end["data"]["permission_denials"], 2)
+        self.assertEqual([e["data"]["tool_use_id"] for e in _of(evs, "tool.start")], ["t1"])   # CMD-T18
 
 
 class SweAgent(unittest.TestCase):
@@ -110,6 +136,7 @@ class SweAgent(unittest.TestCase):
         self.assertTrue(names[1].startswith("#"))                     # 경로는 해시
         ends = _of(evs, "tool.end")
         self.assertTrue(all("is_error" in e["unobserved"] for e in ends))   # 오류 깃발이 없는 원천 -- '성공' 이 아니다
+        self.assertTrue(all("tool_use_id" in e["unobserved"] for e in _of(evs, "tool.start")))  # 수집기가 지은 s<n> 은 원천 id 가 아니다
         end = _of(evs, "run.end")[0]
         self.assertEqual((end["data"]["terminal_reason"], end["data"]["tokens_sent"]), ("submitted", 1000))
         self.assertIn("tokens_received", end["reported_null"])
