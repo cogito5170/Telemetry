@@ -141,8 +141,8 @@ class StreamRuntimeActions(unittest.TestCase):
 
 
 class ToolProgressHeartbeats(unittest.TestCase):
-    """CMD-T10: 주 에이전트 도구의 tool_progress 는 parent_tool_use_id 가 달려 있어도 heartbeat 다(t11 처럼 8 개).
-    하위 에이전트(Task) 안의 사건 · 그 도구의 진행은 여전히 거른다."""
+    """CMD-T12: 실제 t11 꼴 -- 두 id 를 다 단다. tool_use_id 는 지어낸 bash-progress-<n>, 진행 중인 Bash 의 id 는 parent_tool_use_id.
+    주 에이전트 도구의 진행은 heartbeat 8, 하위 에이전트(Task) 안 도구의 진행은 걸러진다."""
 
     ROWS = [{"_t": 0, "line": {"type": "system", "subtype": "init"}},
             {"_t": 10, "line": {"type": "stream_event", "event": {"type": "message_start",
@@ -150,29 +150,33 @@ class ToolProgressHeartbeats(unittest.TestCase):
             {"_t": 20, "line": {"type": "assistant", "message": {"id": "m1", "content": [
                 {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "sleep 150"}},
                 {"type": "tool_use", "id": "task1", "name": "Task", "input": {"prompt": "x"}}]}}}]
-    # t11 꼴: 3 · 30 · 33 · 60 · 63 · 90 · 93 · 120 초, 30 초마다 heartbeat 표시
-    ROWS += [{"_t": 20 + s * 1000, "line": {"type": "tool_progress", "tool_use_id": "t1", "parent_tool_use_id": "t1",
-                                           "elapsed_time_seconds": s, **({"heartbeat": True} if s % 30 == 0 else {})}}
-             for s in (3, 30, 33, 60, 63, 90, 93, 120)]
-    ROWS += [{"_t": 121000, "line": {"type": "tool_progress", "parent_tool_use_id": "t1", "elapsed_time_seconds": 121}},
-             # 하위 에이전트: 그 assistant 줄 · 그 도구의 진행 -- 거른다
+    # t11 실캡처의 키 꼴(값은 지어냄): 3 · 30 · 33 · 60 · 63 · 90 · 93 · 120 초, 30 초마다 heartbeat 표시
+    ROWS += [{"_t": 20 + s * 1000, "line": {
+        "type": "tool_progress", "tool_use_id": f"bash-progress-{i}", "parent_tool_use_id": "t1", "tool_name": "Bash",
+        "session_id": "sess", "task_id": "task-x", "uuid": f"u{i}", "elapsed_time_seconds": s,
+        "heartbeat": True if s % 30 == 0 else None}}
+        for i, s in enumerate((3, 30, 33, 60, 63, 90, 93, 120))]
+    ROWS += [  # 하위 에이전트: 그 assistant 줄 · 그 안 Bash 의 진행(parent 는 Task 호출) -- 거른다
              {"_t": 122000, "line": {"type": "assistant", "parent_tool_use_id": "task1", "message": {
                  "id": "sub1", "content": [{"type": "tool_use", "id": "st1", "name": "Bash", "input": {"command": "ls"}}]}}},
-             {"_t": 123000, "line": {"type": "tool_progress", "tool_use_id": "st1", "parent_tool_use_id": "task1",
-                                     "elapsed_time_seconds": 1}},
+             {"_t": 123000, "line": {"type": "tool_progress", "tool_use_id": "bash-progress-9", "parent_tool_use_id": "task1",
+                                     "tool_name": "Bash", "elapsed_time_seconds": 1}},
+             # 이름 없는 진행 줄 -- 맞출 수 없어 남기지 않는다
+             {"_t": 123500, "line": {"type": "tool_progress", "tool_use_id": "bash-progress-10", "parent_tool_use_id": "t1",
+                                     "elapsed_time_seconds": 121}},
              {"_t": 124000, "line": {"type": "result", "subtype": "success"}}]
 
-    def test_main_tool_progress_kept_subagent_filtered(self):
+    def test_real_shape_main_tool_progress_kept_subagent_filtered(self):
         with tempfile.TemporaryDirectory() as d:
             evs = from_cc_stream(_write(d, "t11.stream.jsonl", self.ROWS), "s", Hasher(KEY))
         self.assertEqual([check(e) for e in evs], [[]] * len(evs))
         hb = _of(evs, "heartbeat")
-        self.assertEqual(len(hb), 9)                    # t11 의 8 + tool_use_id 없이 parent 만 단 1
+        self.assertEqual(len(hb), 8)                                   # t11: 8/8
+        self.assertEqual([e["data"]["reported_elapsed_ms"] for e in hb], [s * 1000 for s in (3, 30, 33, 60, 63, 90, 93, 120)])
         self.assertEqual(sum(1 for e in hb if e["data"]["heartbeat_flag"] is True), 4)
-        self.assertEqual([e["data"]["reported_elapsed_ms"] for e in hb][:8],
-                         [s * 1000 for s in (3, 30, 33, 60, 63, 90, 93, 120)])
-        self.assertEqual(len(_of(evs, "llm.response")), 1)         # 하위 에이전트의 모형 호출은 없다
-        self.assertEqual(len(_of(evs, "tool.start")), 2)           # 주 에이전트의 Bash · Task 만
+        self.assertEqual(sum(1 for e in hb if "heartbeat_flag" in e["reported_null"]), 4)   # 원천이 null 로 줬다
+        self.assertEqual(len(_of(evs, "llm.response")), 1)             # 하위 에이전트의 모형 호출은 없다
+        self.assertEqual(len(_of(evs, "tool.start")), 2)               # 주 에이전트의 Bash · Task 만
 
 
 @unittest.skipUnless((SENSOR / "llmsensor").is_dir(), "옆에 ../Sensor 가 없다")

@@ -37,7 +37,7 @@
  {
   "mutant": "보고된 null 을 못 봄으로",
   "red": true,
-  "tail": "FAILED (failures=7)"
+  "tail": "FAILED (failures=8)"
  },
  {
   "mutant": "하위 에이전트 줄을 섞음",
@@ -162,7 +162,7 @@
  {
   "mutant": "박동 표시가 없는데 False 로 메움",
   "red": true,
-  "tail": "FAILED (failures=1)"
+  "tail": "FAILED (failures=2)"
  },
  {
   "mutant": "흡수된 입력을 안 거둠",
@@ -185,7 +185,12 @@
   "tail": "FAILED (failures=3)"
  },
  {
-  "mutant": "T10: 하위 에이전트 도구의 진행도 남김",
+  "mutant": "T12: tool_use_id 만 봄(T10 의 결함 -- 실기록 0/8)",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "T12: 도구 이름을 안 맞춤(하위 에이전트 진행이 Task 호출 id 로 새어 들어옴)",
   "red": true,
   "tail": "FAILED (failures=3)"
  },

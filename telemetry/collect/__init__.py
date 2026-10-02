@@ -300,14 +300,24 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
 
 
 def _main_progress(d, L) -> bool:
-    """CMD-T10: `tool_progress` 는 진행 중인 도구의 id 를 parent_tool_use_id 에 단다(Sensor 세션이 t11 원본에서 봄).
-    그래서 하위 에이전트 거르기에 같이 걸려 박동이 사라졌다. **주 에이전트가 부른 도구**의 진행이면 남긴다:
-    tool_use_id 가 있으면 그것이, 없으면 parent_tool_use_id 가 이 실행의 도구 장부에 있어야 한다.
-    하위 에이전트의 도구는 장부에 오르지 않으므로(그 assistant 줄을 거른다) 그 진행은 여전히 걸러진다."""
+    """`tool_progress` 가 **주 에이전트가 부른 도구**의 진행이면 남긴다(하위 에이전트 거르기에서 뺀다).
+
+    실제 꼴(CMD-T12, Sensor 세션이 t11 실캡처에서 확인 -- 8 줄 모두): 키 elapsed_time_seconds · heartbeat · parent_tool_use_id ·
+    session_id · task_id · tool_name · tool_use_id · type · uuid. `tool_use_id` 는 런타임이 지은 `bash-progress-<n>` 이라
+    도구 장부에 없고, 진행 중인 Bash 호출의 id 는 `parent_tool_use_id` 에 있다.
+    (CMD-T10 은 tool_use_id 를 먼저 보고 거기서 멈춰 실기록에서 0/8 이었다 -- 합성 꼴만 맞췄다.)
+
+    규칙: 두 id 중 하나가 이 실행의 도구 장부에 있고, **그 장부의 도구 이름이 진행 줄의 tool_name 과 같을 때**만.
+    하위 에이전트(Task) 안 도구의 진행은 parent_tool_use_id 가 Task 호출을 가리킬 수 있다 -- 장부 이름(Task)이
+    진행 줄 이름(Bash …)과 달라 걸러진다. tool_name 이 없는 줄은 이름을 맞출 수 없어 남기지 않는다(짐작 안 함)."""
     if d.get("type") != "tool_progress":
         return False
-    ref = d.get("tool_use_id") or d.get("parent_tool_use_id")
-    return ref in L.tools
+    name = d.get("tool_name")
+    for ref in (d.get("tool_use_id"), d.get("parent_tool_use_id")):
+        t = L.tools.get(ref) if ref else None
+        if t is not None and name and t["start"]["tool_name"] == name:
+            return True
+    return False
 
 
 def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[dict]":
