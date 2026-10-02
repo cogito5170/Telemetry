@@ -62,7 +62,7 @@
  {
   "mutant": "0 을 못 봄으로",
   "red": true,
-  "tail": "FAILED (failures=6, errors=3)"
+  "tail": "FAILED (failures=9, errors=3)"
  },
  {
   "mutant": "봉투를 연다(모르는 칸 허용)",
@@ -123,6 +123,51 @@
   "mutant": "번호가 없는 차례에 번호를 세어 메움",
   "red": true,
   "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "D1: 구조화 칸 timedOutAfterMs 를 안 봄",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "D1: 성공한 출력이 인용한 문구를 시간 초과로",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "D2: 429 줄을 모형 호출로",
+  "red": true,
+  "tail": "FAILED (failures=1, errors=2)"
+ },
+ {
+  "mutant": "D2: <synthetic> 줄을 모형 호출로",
+  "red": true,
+  "tail": "FAILED (failures=3)"
+ },
+ {
+  "mutant": "D2: compat 이 API 오류를 실행 요약에 안 옮김",
+  "red": true,
+  "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutant": "D4: 압축 사건을 안 거둠",
+  "red": true,
+  "tail": "FAILED (errors=1)"
+ },
+ {
+  "mutant": "백그라운드 칸이 없는데 '안 옮김' 으로 메움",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "박동 표시가 없는데 False 로 메움",
+  "red": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutant": "흡수된 입력을 안 거둠",
+  "red": true,
+  "tail": "FAILED (errors=1)"
  },
  {
   "mutant": "L0 가 위층을 import",

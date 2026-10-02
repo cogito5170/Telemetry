@@ -51,8 +51,14 @@ def write_session(path, turns, cost_state=None):
 
 SESSION = [("user", "go"),
            ("tool", "Bash", {"command": "cd /x && make"}, False, "err", {"interrupted": False, "durationSeconds": 1.5}),
-           ("tool", "Bash", {"command": "make"}, False, "Command timed out after 2m", {"interrupted": None}),
+           ("tool", "Bash", {"command": "make"}, False, "Exit code 143\nCommand timed out after 2m 0.0s",
+            {"interrupted": None}),
            ("tool", "Read", {"file_path": "/home/secret/a.py"}, True, "ok", {}),
+           # D1 거짓 양성: 성공한 출력이 문구를 인용 / 거짓 음성: 600 초 초과를 백그라운드로 옮김(구조화 칸만 있다)
+           ("tool", "Bash", {"command": "grep -r timed"}, True, "log: Command timed out after 2m", {}),
+           ("tool", "Bash", {"command": "sleep 700"}, True,
+            "Command did not complete within its 600s timeout and was moved to the background",
+            {"timedOutAfterMs": 600000, "backgroundTaskId": "bg42"}),
            ("side", "하위 에이전트"),
            ("text", "done"),
            ("tool", "Bash", {"command": "sleep 99"}, None, "", {})]      # 결과가 안 왔다(끝나지 않음)

@@ -86,7 +86,11 @@ EVENTS: "dict[str, dict[str, F]]" = {
     "tool.end": {
         "tool_index": _f("int", X),
         "is_error": _f("bool", R, "런타임의 오류 깃발"), "interrupted": _f("bool", R),
-        "timed_out": _f("bool", D, "런타임이 **스스로** 시간 초과를 선언했나(문구 · 예외). 경과 시간을 문턱에 비교한 값이 아니다"),
+        "timed_out": _f("bool", D, "런타임이 **스스로** 시간 초과를 선언했나. 구조화 칸(timedOutAfterMs)이 먼저, 글 문구는 "
+                                   "is_error 이고 결과가 'Exit code' 로 시작할 때만. 경과 시간을 문턱에 비교한 값이 아니다"),
+        "declared_timeout_ms": _f("num", D, "런타임이 선언한 시간 한도(timedOutAfterMs)"),
+        "moved_to_background": _f("bool", R, "시간 한도를 넘은 명령을 런타임이 죽이지 않고 백그라운드로 옮겼다(backgroundTaskId)"),
+        "background_task_ref": _f("str", X, "옮겨진 백그라운드 작업의 id"),
         "exit_code": _f("int", R), "exception": _f("str", R, "예외 종류 이름(메시지는 안 남긴다)"),
         "output_chars": _f("int", M), "reported_duration_ms": _f("num", R),
         "elapsed_ms": _f("num", M, "수집기가 한 시계로 시작~끝을 잰 값"),
@@ -133,12 +137,29 @@ EVENTS: "dict[str, dict[str, F]]" = {
     "runtime.limits": {
         "context_window": _f("int", D), "max_output_tokens": _f("int", D), "autocompact_threshold": _f("int", D),
     },
+    # 요금 한도는 실행이 아니라 **계정**의 것이다(BD-32) -- 실행 실체에 달면 '이 실행이 소모했다' 로 잘못 읽힌다. 실체는 L2 가 정한다
     "provider.rate_limit": {
-        "utilization": _f("num", R), "declared_status": _f("str", D, "런타임의 상태 문자열 그대로(allowed_warning ...)"),
+        "utilization": _f("num", R), "declared_status": _f("str", D, "런타임의 상태 문자열 그대로(allowed_warning · rejected ...)"),
         "declared_threshold": _f("num", D), "resets_at_ms": _f("num", D),
+        "limit_type": _f("str", D, "한도의 종류 이름 그대로(five_hour ...)"),
+        "overage_status": _f("str", D), "overage_disabled_reason": _f("str", D),
+        "fallback_available": _f("bool", D, "런타임이 대체 경로가 있다고 선언했나"),
+    },
+    # ── 런타임 자신의 행동 (BD-53) ──
+    "runtime.compaction": {
+        "trigger": _f("str", D, "auto · manual -- 런타임이 붙인 이름 그대로"),
+        "pre_tokens": _f("int", R), "post_tokens": _f("int", R), "duration_ms": _f("num", R),
+    },
+    "runtime.status": {
+        "declared_status": _f("str", D, "런타임이 알린 진행 상태 그대로(requesting ...)"),
+    },
+    "input.removed": {
+        "reason": _f("str", D, "줄에 선 입력을 런타임이 뺀 까닭 그대로(absorbed_mid_turn ...)"),
     },
     # ── 앞으로의 관측: 생존 · 회복 · 의존 · 행동 결과 (L1 의 liveness · recovery · dependency · action_outcome 의 근거) ──
-    "heartbeat": {"emitter": _f("str", X), "beat": _f("int", M, "그 emitter 의 몇 번째 박동")},
+    "heartbeat": {"emitter": _f("str", X), "beat": _f("int", M, "그 emitter 의 몇 번째 박동"),
+                  "heartbeat_flag": _f("bool", D, "원천이 이 진행 신호에 박동 표시를 붙였나(cc_stream tool_progress.heartbeat)"),
+                  "reported_elapsed_ms": _f("num", R, "원천이 함께 보고한 경과(tool_progress.elapsed_time_seconds)")},
     "dependency.probe": {
         "target": _f("str", M, "#해시"), "status_code": _f("int", R), "error_code": _f("str", T),
         "elapsed_ms": _f("num", M),

@@ -67,18 +67,21 @@ CloudEvents 처럼 `type` 은 **일어난 일**의 종류이고, `id = run_id:se
 |---|---|---|---|
 | `llm.request` | 모형에 보냄(몇 번째 시도인가) | Recorder | execution · recovery |
 | `llm.response` | 응답 하나 -- 토큰(캐시 밖 · 읽기 · 쓰기 5m/1h · 출력 · 생각. 원천이 갈라 주지 않으면 `total_input_tokens` 만) · 끝난 까닭 · HTTP 상태 · 시각 · 경과 | 세 수집기 · Recorder(MS 런타임) | token · latency · cost · provider |
-| `llm.error` | 공급자 오류 -- HTTP 상태 · 공급자 코드(원래 값) · 정준 코드(번역, 볼 것이 없으면 못 봄) · 선언된 대기 · 예외 종류 | Recorder(MS 런타임) | provider · recovery |
-| `tool.start` · `tool.end` | 도구 호출과 결과 -- 오류 깃발 · 중단 · 선언된 시간 초과 · 종료 코드 · 예외 종류 · 출력 길이 · 경과 | 세 수집기 · Recorder | execution · latency · liveness |
+| `llm.error` | 공급자 오류 -- HTTP 상태 · 공급자 코드(원래 값) · 정준 코드(번역, 볼 것이 없으면 못 봄) · 선언된 대기 · 예외 종류 | Recorder(MS 런타임) · cc_jsonl(런타임이 끼운 API 오류 줄) | provider · recovery |
+| `tool.start` · `tool.end` | 도구 호출과 결과 -- 오류 깃발 · 중단 · 선언된 시간 초과(구조화 칸 `timedOutAfterMs` 먼저) · 선언된 시간 한도 · 백그라운드로 옮김 · 종료 코드 · 예외 종류 · 출력 길이 · 경과 | 세 수집기 · Recorder | execution · latency · liveness |
 | `run.start` · `run.end` | 실행 시작 · 끝 요약(런타임이 준 값만. 합계를 우리가 내지 않는다). `run.end.decision_ref` = 그 실행을 낳은 결정 기록 id | cc_stream · sweagent · Recorder(MS 런타임) | execution · cost |
 | `run.snapshot` | 실행 도중의 누적 스냅숏(Claude Code cost-state -- 끝이 아니다) | cc_jsonl | cost |
 | `runtime.limits` | 런타임이 선언한 맥락 창 · 최대 출력 · 자동 압축 문턱 | cc_stream | token |
-| `provider.rate_limit` | 사용률 · 런타임 상태 문자열 · 런타임 문턱 -- **사건마다** 따로(마지막 값으로 덮지 않는다) | cc_stream | provider |
+| `provider.rate_limit` | **계정**의 요금 한도(BD-32) -- 사용률 · 상태 문자열 · 문턱 · 한도 종류(five_hour …) · 초과 사용 상태 · 대체 경로. **사건마다** 따로 | cc_stream(`rate_limit_event`) · cc_jsonl(429 줄의 `quotaLimits`) | provider |
 | `input.received` | 런타임이 입력을 받아 줄에 세움(글은 길이만) | cc_jsonl(`queue-operation enqueue`) | liveness |
 | `turn.start` | 입력이 대화에 들어가 차례가 열림 -- 런타임이 매긴 차례 · 프롬프트 번호, 차례 출처 이름(human · task_notification …) | cc_jsonl(사람 · 알림 입력 줄. isMeta · 하위 에이전트 줄 제외) · cc_stream(`system/init`) | liveness |
 | `turn.end` | 런타임이 차례 끝을 선언함(`marker`: stop_hook_summary · result) | cc_jsonl(Stop 훅 요약, 막히지 않았을 때) · cc_stream(`result`) | liveness |
 | `turn.continued` | Stop 훅이 끝을 막아 차례가 이어짐 | cc_jsonl(`preventedContinuation: true`) | liveness |
 | `source.closed` | 원천의 흐름이 닫힘(종료 코드) -- **수집기가 닫힘을 적었을 때만**. 파일 끝은 닫힘이 아니다 | cc_stream(캡처의 `{"_t", "closed": true, "returncode"}` 줄) | liveness |
-| `heartbeat` | 살아 있다는 박동(emitter 마다 번호) | Recorder | **liveness**(새) |
+| `heartbeat` | 런타임이 '진행 중' 이라고 보낸 신호(emitter 마다 번호 · 원천의 박동 표시 · 원천이 보고한 경과) | Recorder · cc_stream(`tool_progress`) | liveness |
+| `runtime.status` | 런타임이 알린 진행 상태 그대로(requesting …) | cc_stream(`system/status`) | liveness |
+| `input.removed` | 줄에 선 입력을 런타임이 뺌(까닭 그대로: absorbed_mid_turn …) -- 그 입력은 새 차례를 열지 않는다 | cc_jsonl(`queue-operation remove`) | liveness |
+| `runtime.compaction` | 런타임이 맥락을 압축함 -- trigger(auto · manual) · 전후 토큰 · 걸린 시간 | cc_jsonl(`compact_boundary.compactMetadata`) · cc_stream(SDK 꼴 `compact_metadata`, 실기록 미확인) | context · action_outcome |
 | `dependency.probe` | 의존 대상 탐침 -- 상태 코드 · 오류 코드 · 경과 | Recorder | **dependency**(새) |
 | `action.dispatch` · `action.result` | 실행기가 **실제로 실행한** 행동과 그 결과. 결정과는 `decision_ref`(id)로만 잇는다 | Recorder | **action_outcome**(새) |
 
@@ -148,6 +151,14 @@ v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_
 | 6 | Sensor 를 필수 의존으로(Sensor 의 `telemetry/collect.py` 삭제) | 기준 BD-50: 수집기 셋마다 서로 다른 실데이터 기록 3 개 이상에서 100 % 같음. 장부 `eval/l0_check.py` · `eval/results/l0_check_corpus.json` | 쌓는 중 -- sweagent 7 ✅ · cc_jsonl 1 · cc_stream 0 |
 
 ## 10. 잰 것 · 모르는 것
+
+- **수집기 결함 D1–D4 고침(CMD-T6, Sensor `docs/MS_HEALTH_INVENTORY.md` §1)** -- L0 수집기와 Sensor 수집기(`llmsensor/telemetry/collect.py`)를 같은 규칙으로:
+  - D1 시간 초과: 구조화 칸 `timedOutAfterMs` 먼저. 글 문구는 오류 결과이고 'Exit code' 로 시작할 때만(성공 출력의 인용은 아니다).
+  - D2 429: 런타임이 끼운 API 오류 줄(`isApiErrorMessage` · `apiErrorStatus`, 모델 `<synthetic>`)은 모형 호출이 **아니다** -- `llm.error` +
+    `provider.rate_limit`(`quotaLimits`). 꼴 v3 에서는 실행 요약의 `api_error_status` · `rate_limit_status`. 그 밖의 `<synthetic>` 줄도 모형 호출이 아니다.
+  - D3: D2 의 결과로 단가표에 없는 '모델' 이 세션 비용을 None 으로 만들지 않는다.
+  - D4: `compact_boundary` -> `runtime.compaction`.
+  - 합성 세션에서 Sensor State 가 `rate_limit_state = LIMITED` · `runtime_reliability = FAILURE_OBSERVED` 로 읽는다(전에는 UNKNOWN · NO_FAILURE_OBSERVED).
 
 - **차례 경계(CMD-T2) 실데이터**: 이 세션 JSONL 에서 `input.received` 7 · `turn.start` 6 · `turn.end` 5(여섯째 차례는 수집 시점에 열려 있었고,
   일곱째 입력은 차례 중에 줄에 선 알림이다). JSONL 의 `turn.end` 는 **Stop 훅이 있어야** 나온다(그 요약 줄뿐이다) -- 훅이 없는 세션에서는 차례 끝을 못 본다.

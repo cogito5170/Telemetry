@@ -34,8 +34,13 @@ class CCJsonl(unittest.TestCase):
 
     def test_facts_not_judgements(self):
         ends = _of(self.evs, "tool.end")
-        self.assertEqual([e["data"]["is_error"] for e in ends], [True, True, False])
-        self.assertEqual([e["data"]["timed_out"] for e in ends], [False, True, None])   # Read 는 문구를 모른다 -> 못 봄
+        self.assertEqual([e["data"]["is_error"] for e in ends], [True, True, False, False, False])
+        # Read 는 문구를 모른다 -> 못 봄. 인용한 문구는 시간 초과가 아니다(D1 거짓 양성). 구조화 칸이 있으면 시간 초과(D1 거짓 음성)
+        self.assertEqual([e["data"]["timed_out"] for e in ends], [False, True, None, False, True])
+        bg = ends[4]["data"]
+        self.assertEqual((bg["declared_timeout_ms"], bg["moved_to_background"], bg["background_task_ref"]),
+                         (600000, True, "bg42"))
+        self.assertIn("moved_to_background", ends[1]["unobserved"])      # 칸이 없었다 -- '안 옮겼다' 가 아니다
         self.assertEqual(ends[0]["data"]["reported_duration_ms"], 1500)
         self.assertIn("interrupted", ends[1]["reported_null"])                       # 원천이 null 로 줬다
         self.assertIn("interrupted", ends[2]["unobserved"])
@@ -44,7 +49,7 @@ class CCJsonl(unittest.TestCase):
         """결과가 안 온 도구: tool.start 는 있고 tool.end 는 없다. 지어내지 않는다 -- 그 빈자리가 liveness 의 증거다."""
         starts = {e["data"]["tool_index"] for e in _of(self.evs, "tool.start")}
         ends = {e["data"]["tool_index"] for e in _of(self.evs, "tool.end")}
-        self.assertEqual(starts - ends, {3})
+        self.assertEqual(starts - ends, {5})
 
     def test_targets_are_hashed(self):
         heads = [e["data"]["tool_head"] for e in _of(self.evs, "tool.start")]

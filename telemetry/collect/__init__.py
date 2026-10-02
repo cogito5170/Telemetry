@@ -19,6 +19,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from ..errors import translate
 from ..event import make
 from ..hashing import PROGRAM, Hasher, default_hasher, tool_head, tool_sig
 from ..usage import l0_usage
@@ -56,15 +57,32 @@ def _text_len(content) -> int:
 TIMEOUT_TEXT = re.compile(r"Command timed out after")    # Claude Code Bash 의 런타임 선언 문구
 
 
-def _timed_out(tool_name, block) -> "bool | None":
-    """런타임이 시간 초과를 **선언**했나(Bash 결과 글의 문구). 다른 도구는 문구를 모르므로 None(못 봄).
-    경과 시간을 문턱에 비교하지 않는다 -- 그것은 Sensor 의 일이다."""
+def _timed_out(tool_name, block, tur=None) -> "bool | None":
+    """런타임이 시간 초과를 **선언**했나 (D1 고침, Sensor MS_HEALTH_INVENTORY §1).
+    1) 구조화 칸 `toolUseResult.timedOutAfterMs` 가 있으면 그것(도구를 가리지 않는다).
+    2) 없으면 Bash 만: 결과가 오류(is_error)이고 글이 'Exit code' 로 시작하며 문구가 있을 때만 -- 성공한 출력이 문구를
+       **인용**한 것을 시간 초과로 세지 않는다(거짓 양성 2 의 원인).
+    다른 도구는 문구를 모르므로 None(못 봄). 경과 시간을 문턱에 비교하지 않는다 -- 그것은 Sensor 의 일이다."""
+    if isinstance(tur, dict) and "timedOutAfterMs" in tur:
+        return True
     if tool_name != "Bash":
         return None
     c = block.get("content")
     txt = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c if isinstance(x, dict)) \
         if isinstance(c, list) else ""
-    return bool(TIMEOUT_TEXT.search(txt))
+    return bool(block.get("is_error") is True and txt.lstrip().startswith("Exit code") and TIMEOUT_TEXT.search(txt))
+
+
+def _background(tur) -> "tuple[dict, list]":
+    """시간 한도 · 백그라운드 이동(런타임 자신의 행동). 칸이 없으면 못 봄."""
+    if not isinstance(tur, dict):
+        return {}, []
+    v, n = _take(tur, {"declared_timeout_ms": "timedOutAfterMs", "background_task_ref": "backgroundTaskId"})
+    if "timedOutAfterMs" in tur or "backgroundTaskId" in tur:
+        v["moved_to_background"] = bool(tur.get("backgroundTaskId"))
+    if "background_task_ref" in v:
+        v["background_task_ref"] = str(v["background_task_ref"])
+    return v, n
 
 
 class _Ledger:
@@ -78,6 +96,7 @@ class _Ledger:
         self.tools: dict = {}
         self.tool_order: list = []
         self.tail: list = []           # 실행 단위 사건 (줄, type, at, data, nulls)
+        self.beats = 0                 # 진행 신호(heartbeat) 번호
         self.line = 0                  # 지금 읽는 원천 줄 번호 -- 사건 순서(seq)는 원천에 나온 차례를 따른다
 
     def call(self, mid):
@@ -104,13 +123,16 @@ class _Ledger:
                            "t_issued": t, "end": None, "line_start": self.line}
         self.tool_order.append(tid)
 
-    def tool_result(self, block, t, extra=None, extra_nulls=()):
+    def tool_result(self, block, t, extra=None, extra_nulls=(), tur=None):
         d = self.tools.get(block.get("tool_use_id"))
         if d is None:
             return
-        end = {"is_error": bool(block.get("is_error")), "timed_out": _timed_out(d["start"]["tool_name"], block),
+        end = {"is_error": bool(block.get("is_error")), "timed_out": _timed_out(d["start"]["tool_name"], block, tur),
                "output_chars": _text_len(block.get("content"))}
         end.update(extra or {})
+        bg, bgn = _background(tur)
+        end.update(bg)
+        extra_nulls = list(extra_nulls) + bgn
         d["end"], d["t_result"], d["nulls"], d["line_end"] = end, t, list(extra_nulls), self.line
 
     def run_event(self, type, at, data, nulls=()):
@@ -152,6 +174,35 @@ class _Ledger:
         return out
 
 
+def _compaction(meta) -> "tuple[dict, list]":
+    """compact_boundary 의 메타. JSONL 은 camelCase, SDK stream 은 snake_case(stream 꼴은 실기록으로 확인 못 함)."""
+    meta = meta if isinstance(meta, dict) else {}
+    return _take(meta, {"trigger": "trigger", "pre_tokens": "preTokens" if "preTokens" in meta else "pre_tokens",
+                        "post_tokens": "postTokens" if "postTokens" in meta else "post_tokens",
+                        "duration_ms": "durationMs" if "durationMs" in meta else "duration_ms"})
+
+
+def _api_error(L, d, t):
+    """API 오류 줄 -> llm.error (+ quotaLimits 가 있으면 provider.rate_limit). 번역은 Anthropic 대응표(원래 값은 함께)."""
+    st = d.get("apiErrorStatus")
+    try:
+        st = int(st) if st is not None else None
+    except (TypeError, ValueError):
+        st = None
+    err = d.get("error") if isinstance(d.get("error"), str) else None
+    tr = translate("anthropic", st, {"error": {"type": err}} if err else None)
+    nothing = st is None and err is None
+    L.run_event("llm.error", t, {"http_status": st, "provider_code": err,
+                                 "error_code": None if nothing else tr.error_code.value,
+                                 "error_code_source": None if nothing else tr.source})
+    q = d.get("quotaLimits")
+    if isinstance(q, dict):
+        v, n = _take(q, {"declared_status": "status", "limit_type": "rateLimitType", "overage_status": "overageStatus",
+                         "overage_disabled_reason": "overageDisabledReason",
+                         "fallback_available": "unifiedRateLimitFallbackAvailable"})
+        L.run_event("provider.rate_limit", t, v, n)
+
+
 def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[dict]":
     L = _Ledger(run_id, "cc_jsonl", "unix_ms", hasher)
     last_ts = None
@@ -184,6 +235,10 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
                 # 런타임이 입력을 받아 줄에 세웠다 -- 차례가 시작되기 전이다(다른 operation 은 아직 옮기지 않는다)
                 c = d.get("content")
                 L.run_event("input.received", t, {"input_chars": len(c) if isinstance(c, str) else None})
+            elif d.get("type") == "queue-operation" and d.get("operation") == "remove":
+                L.run_event("input.removed", t, {"reason": d.get("reason")})
+            elif d.get("type") == "system" and d.get("subtype") == "compact_boundary":
+                L.run_event("runtime.compaction", t, *_compaction(d.get("compactMetadata")))
             elif d.get("type") == "system" and d.get("subtype") == "stop_hook_summary":
                 # 런타임의 Stop 사건. 훅이 막았으면(preventedContinuation) 차례는 끝나지 않고 이어진다
                 v, nl = _take(d, {"stop_hook_count": "hookCount"})
@@ -203,7 +258,12 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
                 origin = d.get("turnOrigin") or ((d.get("origin") or {}).get("kind") if isinstance(d.get("origin"), dict)
                                                  else None)
                 L.run_event("turn.start", t, {**v, "turn_origin": origin, "input_chars": _text_len(content)}, nl)
-            if d.get("type") == "assistant" and m.get("id"):
+            if d.get("type") == "assistant" and (d.get("isApiErrorMessage") or d.get("apiErrorStatus") is not None):
+                # D2: API 오류(429 등)를 런타임이 대화에 끼운 줄이다 -- 모형 호출이 아니다(model "<synthetic>", 토큰 0)
+                _api_error(L, d, t)
+            elif d.get("type") == "assistant" and m.get("model") == "<synthetic>":
+                pass                                  # 런타임이 지어 넣은 메시지 -- API 호출이 아니다
+            elif d.get("type") == "assistant" and m.get("id"):
                 c = L.call(m["id"])
                 L.seen(c, t)
                 c["model"] = m.get("model")
@@ -231,7 +291,7 @@ def from_cc_jsonl(path, run_id: str, hasher: "Hasher | None" = None) -> "list[di
                     tnull.append("reported_duration_ms")
                 for b in m["content"]:
                     if isinstance(b, dict) and b.get("type") == "tool_result":
-                        L.tool_result(b, t, extra, tnull)
+                        L.tool_result(b, t, extra, tnull, tur)
     return L.events()
 
 
@@ -280,6 +340,17 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
                     c["stop_reason"] = delta.get("stop_reason")
                     if "stop_reason" in delta and delta["stop_reason"] is None:
                         c["sr_null"] = True
+        elif ty == "tool_progress":
+            # 런타임이 '진행 중' 이라고 알린 신호(T5 의 다섯째 뜻). heartbeat 표시와 경과는 원천 그대로
+            beats, L.beats = L.beats, L.beats + 1
+            v, nl = _take(d, {"heartbeat_flag": "heartbeat"})
+            if isinstance(d.get("elapsed_time_seconds"), (int, float)):
+                v["reported_elapsed_ms"] = d["elapsed_time_seconds"] * 1000
+            L.run_event("heartbeat", t, {"emitter": "tool_progress", "beat": beats, **v}, nl)
+        elif ty == "system" and d.get("subtype") == "status":
+            L.run_event("runtime.status", t, {"declared_status": d.get("status")})
+        elif ty == "system" and d.get("subtype") == "compact_boundary":
+            L.run_event("runtime.compaction", t, *_compaction(d.get("compact_metadata") or d.get("compactMetadata")))
         elif ty == "system" and d.get("subtype") == "init":
             L.run_event("turn.start", t, {})        # claude -p: 프롬프트를 받고 세션을 연 런타임 선언 -- 차례 하나
         elif ty == "system" and d.get("subtype") == "thinking_tokens" and cur is not None:
@@ -299,7 +370,7 @@ def from_cc_stream(path, run_id: str, hasher: "Hasher | None" = None) -> "list[d
             for b in m.get("content") or [] if isinstance(m.get("content"), list) else []:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
                     ex, tn = _take(tur, {"interrupted": "interrupted"})
-                    L.tool_result(b, t, ex, tn)
+                    L.tool_result(b, t, ex, tn, tur)
         elif ty == "rate_limit_event":
             info = d.get("rate_limit_info") or {}
             L.run_event("provider.rate_limit", t, {"utilization": info.get("utilization"),

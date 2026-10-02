@@ -6,7 +6,7 @@ llmsensor 를 import 하지 않는다(저장소가 따로라 서로의 설치를
 옮기는 규칙:
     llm.response                    -> model_call  (context_window 는 runtime.limits 에서 -- Sensor 수집기가 그렇게 채운다)
     tool.start (+ 같은 tool_index 의 tool.end) -> tool_call  (t_issued_ms = start.at, t_result_ms = end.at)
-    run.end · 마지막 run.snapshot · runtime.limits · 마지막 provider.rate_limit -> run
+    run.end · 마지막 run.snapshot · runtime.limits · 마지막 provider.rate_limit · 마지막 llm.error(HTTP 상태) -> run
     run 레코드는 실행 단위 사건이 하나라도 있으면, 또는 원천이 cc_stream · sweagent 이면(Sensor 수집기가 늘 낸다) 낸다.
 
 v3 에 자리가 없는 L0 칸(response_id · status_code · elapsed_ms · exit_code · llm.request · llm.error · heartbeat · action.* …)은
@@ -85,7 +85,8 @@ def to_sensor_records(events) -> "list[dict]":
                             "tool_output_chars": "output_chars", "reported_duration_ms": "reported_duration_ms"},
                       vals, nulls)
             out.append(_record("tool_call", run_id, source, vals, nulls))
-        run_evs = [e for e in evs if e["type"] in ("run.end", "run.snapshot", "runtime.limits", "provider.rate_limit")]
+        run_evs = [e for e in evs if e["type"] in ("run.end", "run.snapshot", "runtime.limits", "provider.rate_limit",
+                                                   "llm.error")]
         if not run_evs and source not in ("cc_stream", "sweagent"):
             continue
         vals, nulls = {}, set()
@@ -102,6 +103,9 @@ def to_sensor_records(events) -> "list[dict]":
             for dst, src in (("rate_limit_utilization", "utilization"), ("rate_limit_status", "declared_status"),
                              ("rate_limit_threshold", "declared_threshold")):
                 vals[dst] = d[src]
+        errs = [e for e in run_evs if e["type"] == "llm.error" and e["data"]["http_status"] is not None]
+        if errs:                       # D2: API 오류(429 …)는 모형 호출이 아니라 실행 요약의 api_error_status 로
+            vals["api_error_status"] = str(errs[-1]["data"]["http_status"])
         for e in run_evs:
             if e["type"] == "run.end":
                 _take(e, _same(*e["data"]), vals, nulls)
