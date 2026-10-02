@@ -94,6 +94,11 @@ MUTANTS = [
      '            v, nl = {"heartbeat_flag": bool(d.get("heartbeat"))}, []'),
     ("흡수된 입력을 안 거둠", "telemetry/collect/__init__.py",
      '                L.run_event("input.removed", t, {"reason": d.get("reason")})', '                pass'),
+    ("스트림의 캐시 쓰기 나눔(message_start usage)을 버림 -- Sensor mutation_ms 의 같은 변이를 이쪽으로(CMD-T9)",
+     "telemetry/collect/__init__.py",
+     '                        merged = dict(c.get("_start_usage") or {})', '                        merged = {}'),
+    ("compat 이 꼴 v3 칸 순서를 바꿈(얼린 출력과 달라진다)", "telemetry/compat.py",
+     'RUN = ("model", "run_duration_ms",', 'RUN = ("run_duration_ms", "model",'),
     ("L0 가 위층을 import", "telemetry/ledger.py",
      "from .event import check\n", "from .event import check\ntry:\n    import llmsensor  # noqa\nexcept ImportError:\n    pass\n"),
 ]

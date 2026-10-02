@@ -62,7 +62,7 @@
  {
   "mutant": "0 을 못 봄으로",
   "red": true,
-  "tail": "FAILED (failures=9, errors=3)"
+  "tail": "FAILED (failures=9, errors=4)"
  },
  {
   "mutant": "봉투를 연다(모르는 칸 허용)",
@@ -107,7 +107,7 @@
  {
   "mutant": "닫힘 표시 없이 파일 끝을 닫힘으로",
   "red": true,
-  "tail": "FAILED (failures=3)"
+  "tail": "FAILED (failures=4)"
  },
  {
   "mutant": "L0 가 turn_open 을 계산해 싣는다",
@@ -170,8 +170,18 @@
   "tail": "FAILED (errors=1)"
  },
  {
-  "mutant": "L0 가 위층을 import",
+  "mutant": "스트림의 캐시 쓰기 나눔(message_start usage)을 버림 -- Sensor mutation_ms 의 같은 변이를 이쪽으로(CMD-T9)",
   "red": true,
   "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutant": "compat 이 꼴 v3 칸 순서를 바꿈(얼린 출력과 달라진다)",
+  "red": true,
+  "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutant": "L0 가 위층을 import",
+  "red": true,
+  "tail": "FAILED (failures=4)"
  }
 ]

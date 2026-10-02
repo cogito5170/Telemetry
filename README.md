@@ -55,14 +55,14 @@ records = to_sensor_records(ledger.read("ledger.jsonl"))       # -> llmsensor.st
 ```
 
 ```bash
-python3 -m unittest discover -s tests -t .    # 33 개. 옆에 ../Sensor 가 있으면 Sensor 수집기와의 대조까지
-python3 eval/mutation.py                      # 변이 17 가지 -- 모두 빨개져야 한다
+python3 -m unittest discover -s tests -t .    # 옆에 ../Sensor 가 있으면 Sensor 이음매 · State 까지. 얼린 출력(tests/golden)과의 대조는 늘
+python3 eval/mutation.py                      # 변이 -- 모두 빨개져야 한다
 ```
 
 ## 알고 쓸 것
 
 - 수집기 셋은 Sensor 의 수집기(꼴 v3)를 옮긴 것이다. 같은 원천에서 `compat` 이 되지은 레코드는 Sensor 의 것과 **같다**(시험 · 실데이터 한 세션).
-- Sensor 는 이 저장소를 **선택 의존**으로 쓴다(`llmsensor.telemetry.l0` · `pip install "llmsensor[l0]"`). 없으면 Sensor 수집기로 돈다.
+- Sensor 는 이 저장소를 **필수 의존**으로 쓴다(CMD-T9). Sensor 의 옛 수집기는 지웠고 `llmsensor.telemetry.collect` 는 이 저장소 수집기 위의 이음매다.
 - MS 는 결정 기록을 텔레메트리에서 뗐다(`RunRecord.decision_ref` → `DecisionRecord.id`). MS 런타임은 Recorder 로 L0 를 직접 낸다(`Runtime(l0_ledger=…)` · `ms ask --l0-ledger`).
 - liveness · recovery · dependency · action_outcome 의 **L0 사건은 있다**(heartbeat · llm.request.attempt · dependency.probe · action.*).
   그것을 읽는 L1 팩은 아직 없다.

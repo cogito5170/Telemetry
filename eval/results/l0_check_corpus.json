@@ -9,7 +9,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "c802990f6e10d39f",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -21,7 +23,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "b1856056283ad62a",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -33,7 +37,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "2e96fcba87ba5a4a",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -45,7 +51,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "14a783f18bc57803",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -57,7 +65,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "fc1bb8d082465f78",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -69,7 +79,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "4bf5338fca64ed28",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "sweagent",
@@ -81,7 +93,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "a86fbfdbf2f25103",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "cc_jsonl",
@@ -93,7 +107,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e246ada",
-  "sensor": "de659f5"
+  "sensor": "de659f5",
+  "v3_digest": "d38370f341ae18b1",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "cc_jsonl",
@@ -105,7 +121,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "e81b49a",
-  "sensor": "2806943"
+  "sensor": "2806943",
+  "v3_digest": "c3b4e9bf2f9e5764",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "cc_jsonl",
@@ -143,7 +161,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "4232aa3",
-  "sensor": "2806943"
+  "sensor": "2806943",
+  "v3_digest": "24710a4951b41bdf",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "cc_stream",
@@ -155,7 +175,9 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "4232aa3",
-  "sensor": "2806943"
+  "sensor": "2806943",
+  "v3_digest": "6a282f4ac580c69c",
+  "frozen_sensor": "f6f02fc"
  },
  {
   "source": "cc_stream",
@@ -167,6 +189,8 @@
   "diff_fields": [],
   "checked": "2026-10-02",
   "telemetry": "4232aa3",
-  "sensor": "2806943"
+  "sensor": "2806943",
+  "v3_digest": "4cdbfa1662710559",
+  "frozen_sensor": "f6f02fc"
  }
 ]
