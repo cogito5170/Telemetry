@@ -50,6 +50,14 @@ USAGE = {
     "server_tool_requests": _f("int", R), "iterations": _f("int", M, "usage.iterations 목록의 길이"),
 }
 
+# 세션 사이 메시지 한 통의 사실(보낸 쪽 · 받은 쪽이 같은 칸을 쓴다)
+PEER = {
+    "from_session": _f("str", X, "보낸 세션 이름"), "to_session": _f("str", X, "받는 세션 이름"),
+    "msg_id": _f("str", X, "메시지 id 그대로"), "in_reply_to": _f("str", X, "답하는 메시지 id. 답이 아니면 없다(null)"),
+    "schema": _f("str", R, "메시지의 ga 꼴 이름(예: notify/1)"), "bytes": _f("int", M, "와이어 머리(head)의 바이트 수"),
+    "tokens_est": _f("int", M, "ceil(bytes/4) -- 어림. 모형이 센 수가 아니다"),
+}
+
 EVENTS: "dict[str, dict[str, F]]" = {
     # ── 모형 호출 ────────────────────────────────────────────────────────────
     "llm.request": {
@@ -184,6 +192,15 @@ EVENTS: "dict[str, dict[str, F]]" = {
         "action_ref": _f("str", X), "is_error": _f("bool", R), "exit_code": _f("int", R), "status_code": _f("int", R),
         "exception": _f("str", R), "output_chars": _f("int", M), "elapsed_ms": _f("num", M),
     },
+    # ── 세션 사이 메시지 (CMD-NET1, POL-3): 누가 누구에게 무엇을 보냈나 -- 사실만. 쓸모 · 신뢰 · 점수 칸은 없다 ──
+    "peer.message.sent": dict(PEER),
+    "peer.message.received": dict(PEER),
+}
+
+# 반드시 값이 있어야 하는 칸 -- 없으면 사건이 아니다(event.check / make 가 거부한다)
+REQUIRED: "dict[str, tuple[str, ...]]" = {
+    "peer.message.sent": ("from_session", "to_session", "msg_id", "schema", "bytes", "tokens_est"),
+    "peer.message.received": ("from_session", "to_session", "msg_id", "schema", "bytes", "tokens_est"),
 }
 
 # ── 해석 어휘 금지 ───────────────────────────────────────────────────────────

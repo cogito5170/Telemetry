@@ -14,7 +14,7 @@ null 인 칸은 그 이름이 **정확히 한 목록**에 있다 (Sensor 꼴 v2 
 """
 from __future__ import annotations
 
-from .catalog import EVENTS, SPEC, TIME_BASES
+from .catalog import EVENTS, REQUIRED, SPEC, TIME_BASES
 
 ENVELOPE = ("spec", "id", "type", "run_id", "seq", "source", "at", "time_base", "data", "unobserved", "reported_null")
 _PY = {"int": (int,), "num": (int, float), "str": (str,), "bool": (bool,)}
@@ -89,6 +89,9 @@ def check(ev: dict) -> "list[str]":
             errs.append(f"{k}: {f.type} 이 아니다 ({v!r})")
         elif f.type in ("int", "num") and f.origin != "ref" and v < 0 and k not in ("exit_code",):
             errs.append(f"{k}: 음수 {v}")
+    for k in REQUIRED.get(ev["type"], ()):
+        if data.get(k) is None:
+            errs.append(f"{ev['type']}.{k}: 꼭 있어야 하는 칸이 비었다")
     for k in ev["unobserved"] + ev["reported_null"]:
         if k not in fields:
             errs.append(f"목록에 꼴 밖 칸 {k}")

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "l0-telemetry"
-version = "0.1.0"
+version = "0.2.0"
 description = "L0 Telemetry -- 판단 없는 관측 사실의 원장. Sensor(L1) 아래의 독립 관측 층"
 readme = "README.md"
 requires-python = ">=3.10"
